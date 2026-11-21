@@ -1,50 +1,40 @@
 # Dónde vive la landing / Where the landing lives
 
-La landing (`site/`) se publica en **Cloudflare**, como un Worker que sirve los
-archivos estáticos de `astro build`. Sale de `main`: la landing ofrece la
-release pública, y `main` es lo que ya salió.
+La landing de Star Music ya no vive en este repo. Está en el sitio de Starless,
+en el repo [`Starless-org/Starless`](https://github.com/Starless-org/Starless),
+bajo la ruta `/star-music/`: su página, sus textos en inglés y español, sus
+logos y la guía de su diseño (`docs/star-music/`) se mudaron allá tal cual.
 
-The landing (`site/`) is published on **Cloudflare**, as a Worker that serves
-the static files `astro build` writes. It ships from `main`.
+The Star Music landing no longer lives in this repo. It is part of the Starless
+site, in [`Starless-org/Starless`](https://github.com/Starless-org/Starless),
+under `/star-music/`. Its page, its English and Spanish text, its logos and its
+design notes (`docs/star-music/`) moved there unchanged.
 
-## Antes / Before
+## Por qué / Why
 
-Hasta noviembre de 2026 se publicaba en dos lugares: en Vercel, en la raíz de
-su dominio, y en GitHub Pages, bajo `/StarMusic`.
-`astro.config.mjs` elegía el prefijo leyendo `VERCEL`. Con la mudanza del repo a
-`Starless-org` las dos se dejaron: Pages ya no estaba activado en el repo, y
-Vercel se reemplazó por Cloudflare, donde ya vive el relay.
+Starless reúne las landings de todas sus apps en un solo sitio, cada una en su
+ruta. Los enlaces de descarga de la landing consultan la última release de
+GitHub al cargar, así que no depende de la versión de la app y puede
+publicarse desde otro repo.
 
-## Cómo se publica
+## Lo que queda acá: la dirección vieja / What is left here: the old address
+
+`https://star-music.bairovillar.workers.dev` sigue respondiendo, con una
+redirección permanente (301) a la landing nueva. Así no se rompen los enlaces
+ya compartidos ni las tarjetas que los chats guardaron.
 
 | | |
 | --- | --- |
-| Dirección | `https://star-music.bairovillar.workers.dev` |
-| `base` | `/` |
-| Quién publica | `.github/workflows/landing.yml`, en cada push a `main` que toque `site/` |
-| Configuración | `site/wrangler.jsonc` |
+| Código | `landing-redirect/src/index.ts`: conserva la ruta y la query (`/star-music.png` → `…/star-music/star-music.png`) |
+| Destino | `TARGET` en `landing-redirect/wrangler.jsonc` |
+| Quién publica | `.github/workflows/landing.yml`, en cada push a `main` que toque `landing-redirect/` |
 
-El marcado lee el prefijo de `import.meta.env.BASE_URL`. **Un enlace interno
-nuevo va con `BASE_URL`, nunca con `/` escrito a mano**: si algún día la página
-vuelve a vivir bajo un prefijo, con el prefijo equivocado carga sin ícono, sin
-el logo de vidrio y sin fuentes, y no dice por qué.
+Cuando el sitio de Starless tenga su dominio (`starless.cl`), se cambia
+`TARGET` a `https://starless.cl/star-music/`.
 
-## Lo que necesita el workflow
+## Lo que necesita el workflow / What the workflow needs
 
-Dos secretos del repo, que se cargan una vez:
+Los mismos dos secretos del repo de antes: `CLOUDFLARE_ACCOUNT_ID` y
+`CLOUDFLARE_API_TOKEN` (plantilla *Edit Cloudflare Workers*).
 
-- **`CLOUDFLARE_ACCOUNT_ID`**: el id de la cuenta (`bunx wrangler whoami`).
-- **`CLOUDFLARE_API_TOKEN`**: un token de la plantilla *Edit Cloudflare
-  Workers*, creado en <https://dash.cloudflare.com/profile/api-tokens>. Sólo
-  puede editar Workers; no es la sesión de nadie.
-
-Sin ellos el workflow falla en el paso de Cloudflare y la landing sigue con la
-versión anterior.
-
-A mano, desde `site/`: `bun run build && bunx wrangler deploy`.
-
-## Un dominio propio
-
-Cuando la landing tenga dominio: se agrega como *Custom Domain* del Worker
-`star-music` en Cloudflare, y se cambia `site` en `astro.config.mjs`, que es la
-dirección absoluta a la que apunta la tarjeta para compartir.
+A mano, desde `landing-redirect/`: `bunx wrangler deploy`.

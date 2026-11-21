@@ -19,20 +19,6 @@ updates:
       app-minor-patch:
         update-types: [minor, patch]
 
-  - package-ecosystem: bun
-    directory: /site
-    target-branch: develop
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: chore
-      include: scope
-    groups:
-      site-minor-patch:
-        update-types: [minor, patch]
-
   - package-ecosystem: cargo
     directory: /src-tauri
     target-branch: develop

@@ -1,0 +1,15 @@
+// The landing moved to the Starless site (Starless-org/Starless, under
+// /star-music/). This Worker keeps its old address alive: every request to
+// star-music.<account>.workers.dev answers with a permanent redirect to the
+// same file under TARGET. The name stays "star-music" because the name is the
+// address. Deployed by .github/workflows/landing.yml; see docs/landing-hosting.md.
+{
+  "name": "star-music",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "vars": {
+    // Ends with a slash. Change it to https://starless.cl/star-music/ once the
+    // domain is connected to the Starless site.
+    "TARGET": "https://starless.bairovillar.workers.dev/star-music/"
+  }
+}

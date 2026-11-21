@@ -79,14 +79,13 @@ src-tauri/src/
   settings.rs             lo que sobrevive a un reinicio
   logging.rs              el log local con rotación
 relay/                    el Worker que recibe los reportes y crea los issues
-site/                     la landing en Astro; su texto vive en site/src/i18n (i18next)
+landing-redirect/         el Worker que lleva la dirección vieja de la landing al sitio de Starless
 .agent/                   configuración de agentes (Claude Code y OpenCode)
 docs/updates.md           cómo se publica una versión
 docs/escribir-playlists.md el protocolo para crear una playlist, y cómo se supo
 docs/jam.md               el protocolo de la sesión compartida, y cómo se supo
 docs/android.md           llevar la app a Android: lo que hay que medir antes
-docs/landing-i18n.md      los idiomas de la landing: dónde vive cada texto y cómo se agrega
-docs/landing-hosting.md   dónde se publica la landing (Cloudflare) y qué necesita el workflow
+docs/landing-hosting.md   dónde vive la landing (en Starless-org/Starless) y el redirect que quedó acá
 docs/soloist.md           la salida de emergencia para las cuentas sin claves: el plan con Soloist
 ```
 

@@ -1,12 +1,12 @@
-name: Landing
+name: Landing redirect
 
+# The landing moved to the Starless site (Starless-org/Starless). What is left
+# here is the Worker that answers at the old address with a redirect to it; see
+# docs/landing-hosting.md.
 on:
   push:
-    # Sólo `main`: la landing ofrece la release pública, y `main` es lo que ya
-    # salió. Publicarla desde `develop` mostraría texto de algo que todavía no
-    # se puede descargar.
     branches: [main]
-    paths: ["site/**", ".github/workflows/landing.yml"]
+    paths: ["landing-redirect/**", ".github/workflows/landing.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -18,19 +18,15 @@ permissions:
 
 jobs:
   deploy:
-    name: Publish the landing to Cloudflare
+    name: Publish the redirect to Cloudflare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - name: Build
-        working-directory: site
-        run: bun install --frozen-lockfile && bun run build
-      # El token y la cuenta son secretos del repo (ver docs/landing-hosting.md).
-      # El token sólo puede editar Workers: no es la sesión de nadie.
+      # The token and the account are repo secrets (see docs/landing-hosting.md).
+      # The token can only edit Workers: it is nobody's session.
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: site
+          workingDirectory: landing-redirect
           command: deploy

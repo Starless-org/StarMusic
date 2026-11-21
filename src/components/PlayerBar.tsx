@@ -333,13 +333,26 @@ export function PlayerBar({
         } as React.CSSProperties)
       : undefined,
   };
+  /*
+      **Listen only when the waves can be drawn.** Each pulse reaches the
+      webview as a script it compiles and runs, about thirty a second for as
+      long as music plays, and the backend sends it only to a webview that has
+      a listener. The phone has no volume slider and "Desactivado" draws no
+      waves, yet both listened: measured on a Galaxy S22, 31 scripts a second
+      with the screen still, all of them for nothing.
+  */
+  const drawsWaves = !mobile && beat !== "off";
   useEffect(() => {
+    if (!drawsWaves) {
+      pulse.set(0);
+      return;
+    }
     const gain = beat === "soft" ? 0.5 : 1;
     const unlisten = onBeat((value) => pulse.set(value * gain));
     return () => {
       void unlisten?.then((stop) => stop());
     };
-  }, [pulse, beat]);
+  }, [pulse, beat, drawsWaves]);
 
   const busy = loading;
   /**

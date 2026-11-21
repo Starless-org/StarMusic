@@ -77,6 +77,8 @@ applyCachedTheme();
 applyCachedSurfaceOpacity();
 // The phone's long press has its own path (PhoneTrackRow); right-click is the desktop's.
 if (!isMobile()) routeContextMenu();
+// For the CSS that only the phone's layout needs (index.css, "The phone's content").
+document.documentElement.toggleAttribute("data-phone", isMobile());
 // For the life of the window: the glass play button's light follows the mouse.
 followPointer();
 

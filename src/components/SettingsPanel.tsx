@@ -1875,11 +1875,22 @@ function Custom({ t, part }: { t: Record<StringKey, string>; part: CustomPart })
                 : undefined
             }
           >
+            {/*
+              **On the phone the scale takes the row, and the number only its
+              own width.** The control goes under the text at the full width
+              there, but the column with the slider and its two ends did not
+              grow: the slider sat at its narrowest, "Transparente" and
+              "Sólido" ran into one word under it, and the number kept the
+              74px it reserves beside a desktop slider. `flex-1` does nothing
+              on the desktop, where the control is as wide as its content.
+            */}
             <span className="flex items-center gap-3">
-              <span className="min-w-[74px] text-right text-[12px] text-ink-faint tabular">
+              <span
+                className={`${isMobile() ? "min-w-[40px]" : "min-w-[74px]"} text-right text-[12px] text-ink-faint tabular`}
+              >
                 {opacity === null ? "…" : `${opacity}%`}
               </span>
-              <span className="flex flex-col gap-1.5">
+              <span className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <PeekSlider
                   value={opacity ?? SURFACE_OPACITY_DEFAULT}
                   valueText={`${opacity ?? SURFACE_OPACITY_DEFAULT}%`}
@@ -1890,7 +1901,7 @@ function Custom({ t, part }: { t: Record<StringKey, string>; part: CustomPart })
                   onChange={change}
                   label={t.surfaceOpacity}
                 />
-                <span className="flex justify-between text-[11.5px] text-ink-faint">
+                <span className="flex justify-between gap-3 text-[11.5px] text-ink-faint">
                   <span>{t.surfaceOpacityClear}</span>
                   <span>{t.surfaceOpacitySolid}</span>
                 </span>

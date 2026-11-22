@@ -50,7 +50,7 @@ The wordmark is lowercase "star music" in Syne 700, −0.03em, silver gradient (
 
 ## Colour
 
-"A night without stars": deep blacks, one warm light. The same tokens as the landing (`site/DESIGN.md`) and `brand-kit/tokens.css`. Roughly 60% Void, 22% Night, 10% Bone, the rest accents.
+"A night without stars": deep blacks, one warm light. The same tokens as the landing (`docs/star-music/DESIGN.md` in Starless-org/Starless) and `brand-kit/tokens.css`. Roughly 60% Void, 22% Night, 10% Bone, the rest accents.
 
 | Token | Value | Use |
 |---|---|---|

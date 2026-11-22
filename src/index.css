@@ -646,6 +646,21 @@
 }
 
 /*
+ * **The phone's content: the fade stays, so the frost goes.** On the phone
+ * `<main>` keeps its mask at every opacity —it has no `content-fade` and no
+ * `EdgeFade`— so it is a backdrop root, and a `backdrop-filter` inside it blurs
+ * the inside of `<main>`, never the picture. Measured on a Galaxy S22 over the
+ * 250 songs of a playlist, which are one 16,000px `surface-card`: screenshots
+ * with and without the blur are the same picture, and without it the GPU spent
+ * 38% less finishing each frame (1272ms → 792ms over three swipes) and 40% less
+ * rasterising (759ms → 459ms). A blur nobody sees, paid on every frame of a
+ * scroll, on a battery. The tint stays: that is the part that shows.
+ */
+:root[data-phone] main :is(.surface, .surface-tile, .surface-card, .surface-chip) {
+  backdrop-filter: none;
+}
+
+/*
  * The fade that replaces the mask while the surfaces frost (`EdgeFade` in App.tsx):
  * a strip of the ground at each edge, opaque at the window's side and clear at the
  * content's. Without frost the mask is still there, and the strips stay out.

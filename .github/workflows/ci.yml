@@ -113,7 +113,12 @@ jobs:
 
   branch:
     name: Branch name
-    if: github.event_name == 'pull_request'
+    # Dependabot names its branches `dependabot/<ecosystem>/...` and cannot be
+    # told otherwise, so the rule would fail every one of its PRs and none could
+    # merge. The author is checked and not the actor: the actor changes when
+    # someone else pushes to the branch, the author does not. A skipped job
+    # counts as passing for a required check.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

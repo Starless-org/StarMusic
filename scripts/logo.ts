@@ -6,7 +6,7 @@
  * them. No stars anywhere: the name is *Star Music* and the mark keeps its word.
  * The logo is grey only; the Ember accent lives in the interface, not in the mark.
  *
- *   bun run logo          writes public/star-music*.svg (and site/public), and every app icon
+ *   bun run logo          writes public/star-music*.svg and every app icon
  *   bun run logo:icons    just the app icons
  *   bun run logo:invert   the development mark (light plate), into icons-dev/
  *   bun run logo:android  the Android launcher icon, as adaptive layers, into gen/android
@@ -25,8 +25,6 @@ import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
 const PUBLIC = join(ROOT, "public");
-/** The landing serves the same marks: favicon, header and hero. */
-const SITE_PUBLIC = join(ROOT, "site", "public");
 
 /** Where the icons land. Development writes somewhere else so it cannot clobber a release. */
 const ICONS = join(ROOT, "src-tauri", "icons");
@@ -917,10 +915,9 @@ if (only !== "--icons") {
         ["star-music-light.svg", flatMark(true)],
         ["star-music-mono.svg", monoMark()],
       ];
-  const dirs = invert ? [PUBLIC] : [PUBLIC, SITE_PUBLIC];
-  for (const dir of dirs) mkdirSync(dir, { recursive: true });
+  mkdirSync(PUBLIC, { recursive: true });
   for (const [name, body] of marks) {
-    for (const dir of dirs) writeFileSync(join(dir, name), body, "utf8");
+    writeFileSync(join(PUBLIC, name), body, "utf8");
     console.log(join("public", name));
   }
 }

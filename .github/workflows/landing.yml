@@ -21,10 +21,10 @@ jobs:
     name: Publish the redirect to Cloudflare
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The token and the account are repo secrets (see docs/landing-hosting.md).
       # The token can only edit Workers: it is nobody's session.
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -926,7 +926,14 @@ function PhoneSettings({
       >
         {header(t.settingsTitle, onClose, t.close)}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          <Group>
+          {/*
+            The card of a `Group`, but not a `Group`: a `Group` hides itself
+            when it holds no `.setting-row`, which is how the search drops the
+            cards it emptied. This list holds buttons, not rows, so as a
+            `Group` it was always hidden and the phone's Settings opened on a
+            title, a version and nothing to tap.
+          */}
+          <div className="overflow-hidden rounded-card border border-white/8 bg-white/4">
             {SECTIONS.map((key) => {
               const Icon = SECTION_ICONS[key];
               return (
@@ -942,7 +949,7 @@ function PhoneSettings({
                 </button>
               );
             })}
-          </Group>
+          </div>
           <div className="mt-4 px-1">
             <p className="text-[12px] text-ink-muted">{t.savedAutomatically}</p>
             {build}
@@ -2639,9 +2646,15 @@ function Row({
       164px select beside a description leaves the description a column of
       three words. A switch is small enough to stay where it is.
   */
+  /*
+      **Both shapes carry `setting-row`.** Every card hides itself when it
+      holds none —that is how the search drops the cards it emptied— and this
+      shape once went without it: on the phone every card of every section
+      hid, and a section opened on its title and nothing else.
+  */
   if (isMobile() && !(isValidElement(children) && children.type === Toggle)) {
     return (
-      <div className="border-b border-white/8 px-5 py-4 last:border-b-0">
+      <div className="setting-row border-b border-white/8 px-5 py-4 last:border-b-0">
         <p className="relative w-fit text-[13.5px] font-semibold">
           {label}
           {tools}

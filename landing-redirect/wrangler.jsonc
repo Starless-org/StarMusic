@@ -8,8 +8,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "vars": {
-    // Ends with a slash. Change it to https://starless.cl/star-music/ once the
-    // domain is connected to the Starless site.
-    "TARGET": "https://starless.bairovillar.workers.dev/star-music/"
+    // Ends with a slash. The Starless site lives on Cloudflare Pages until
+    // starless.cl exists; then this becomes https://starless.cl/star-music/.
+    "TARGET": "https://starless-org.pages.dev/star-music/"
   }
 }

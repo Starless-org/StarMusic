@@ -17,7 +17,7 @@
         "tailwindcss": "^4.3.3",
       },
       "devDependencies": {
-        "@baironvillar/star": "github:Starless-org/Star#v0.8.1",
+        "@baironvillar/star": "github:Starless-org/Star#v0.8.2",
         "@biomejs/biome": "^2.5.15",
         "@tauri-apps/cli": "^2",
         "@types/react": "^19.1.8",
@@ -29,7 +29,7 @@
     },
   },
   "packages": {
-    "@baironvillar/star": ["@baironvillar/star@github:Starless-org/Star#e7ed60a", { "bin": { "star": "./src/cli.ts" } }, "Starless-org-Star-e7ed60a", "sha512-klMruOUoWwoC9PxhTKlpKl8teqUB027BOpy6m4iKwUXtwmop58LJUI/ekpdWyZY1qNAEoWmhGHcYt8SH8kJdXQ=="],
+    "@baironvillar/star": ["@baironvillar/star@github:Starless-org/Star#0351f74", { "bin": { "star": "./src/cli.ts" } }, "Starless-org-Star-0351f74", "sha512-cEeR6Oott86C4O5UgYWqyhkYE8+5fFTnvUHT/rC5hMhh5rUnvmJ153GA7FdsIF3n4bjbSxk9rfiTqe/iGyOEeA=="],
 
     "@biomejs/biome": ["@biomejs/biome@2.5.15", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.5.15", "@biomejs/cli-darwin-x64": "2.5.15", "@biomejs/cli-linux-arm64": "2.5.15", "@biomejs/cli-linux-arm64-musl": "2.5.15", "@biomejs/cli-linux-x64": "2.5.15", "@biomejs/cli-linux-x64-musl": "2.5.15", "@biomejs/cli-win32-arm64": "2.5.15", "@biomejs/cli-win32-x64": "2.5.15" }, "bin": { "biome": "bin/biome" } }, "sha512-WZTW4slm/pdkh92K6t/3aEN++44JD1PQ7squ7RCMLI1flHGl43DVOIGXvCjHiZgBMO1V4uYxoFNtqrIA4qGuIQ=="],
 

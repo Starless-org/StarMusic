@@ -29,4 +29,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: landing-redirect
+          # Without this the action installs wrangler 3.90, which does not read
+          # wrangler.jsonc and fails with "Missing entry-point".
+          wranglerVersion: "4.166.0"
           command: deploy

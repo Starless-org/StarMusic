@@ -721,15 +721,15 @@
 }
 
 @utility page-forward {
-  animation: page-forward 340ms var(--ease-glass) both;
+  animation: page-forward 340ms var(--ease-glass) backwards;
 }
 
 @utility page-back {
-  animation: page-back 340ms var(--ease-glass) both;
+  animation: page-back 340ms var(--ease-glass) backwards;
 }
 
 @utility page-tab {
-  animation: page-tab 260ms var(--ease-glass) both;
+  animation: page-tab 260ms var(--ease-glass) backwards;
 }
 
 /* The tab bar's icon, when its tab becomes the one you are on. */

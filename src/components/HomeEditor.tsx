@@ -176,12 +176,27 @@ export function QuickAccess({
 
         return (
           <motion.div
-            key={id}
+            // **A new key when the editor opens or closes, because motion reads
+            // `layout` once, when the element mounts** (`createProjectionNode`
+            // in framer-motion: "TODO: Update options in an effect"). The tiles
+            // mount outside the editor, so a `layout` that turned on with the
+            // editor stayed off: the others jumped into place instead of
+            // making room. Remounting is invisible —same art, same place.
+            key={`${editing ? "edit" : "view"}:${id}`}
             ref={sortable.register(id)}
             // Only in the editor, where the order changes under a finger and
             // the others make room with a spring. The view change is the
             // compositor's (above), and two animations on one box would fight.
-            layout={editing && !lifted}
+            layout={editing}
+            // …and the tile under the finger never animates its slot. It is
+            // already where the finger is (`useSortable` offsets it for the new
+            // slot in the same frame); a layout animation on top threw it back
+            // to the slot it left, 115px behind the finger, and slid it over.
+            // `layout` cannot turn off mid-drag (read once, above), but
+            // `layoutDependency` is read every render: a value that holds still
+            // while lifted means motion takes no snapshot of it, and so has no
+            // jump to animate. Undefined —the default— measures every render.
+            layoutDependency={lifted ? "lifted" : undefined}
             transition={SPRING}
             style={lifted ? { x: sortable.x, y: sortable.y, zIndex: 10 } : undefined}
             animate={{ scale: lifted ? 1.04 : 1 }}

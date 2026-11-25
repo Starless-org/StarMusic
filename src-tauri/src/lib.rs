@@ -17,6 +17,7 @@ mod crossfade;
 mod history;
 mod keycheck;
 mod keyprobe;
+mod home_layout;
 mod library_organisation;
 // Named `selftest`, never `diagnostic`: the `diagnostic` crate provides the
 // `#[diagnostic::on_unimplemented]` attribute that `#[tauri::command]` expands
@@ -2046,6 +2047,24 @@ async fn set_pinned_order(
         .map_err(|_| "command_failed".to_string())?
 }
 
+/// How Home is arranged for this account (`home_layout.rs`).
+#[tauri::command]
+async fn home_layout(account: String) -> Result<home_layout::HomeLayout, String> {
+    tauri::async_runtime::spawn_blocking(move || home_layout::load(&account))
+        .await
+        .map_err(|_| "command_failed".to_string())?
+}
+
+#[tauri::command]
+async fn set_home_layout(
+    account: String,
+    layout: home_layout::HomeLayout,
+) -> Result<home_layout::HomeLayout, String> {
+    tauri::async_runtime::spawn_blocking(move || home_layout::save(&account, layout))
+        .await
+        .map_err(|_| "command_failed".to_string())?
+}
+
 /// How a playlist's songs are ordered, as `<order>-<asc|desc>`. Same reasoning
 /// as `library_sort`: the default is answered here, in one place.
 #[tauri::command]
@@ -2389,6 +2408,8 @@ pub fn run() {
             library_organisation,
             set_playlist_preference,
             set_pinned_order,
+            home_layout,
+            set_home_layout,
             library_view,
             set_library_view,
             track_order,

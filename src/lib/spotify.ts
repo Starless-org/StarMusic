@@ -2,6 +2,7 @@ import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-quer
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useMemo, useSyncExternalStore } from "react";
+import { type HomeLayout, normaliseHomeLayout } from "./homeLayoutModel";
 import { errors, type Lang } from "./i18n";
 import {
   type LibraryOrganisation,
@@ -40,6 +41,24 @@ export async function setPlaylistPreference(
   if (!preference.pinned && !preference.archived) delete updated[id];
   localStorage.setItem(`star-music:library:${account}`, JSON.stringify(updated));
   return updated;
+}
+
+/** How Home is arranged for this account (`home_layout.rs`). */
+export async function homeLayout(account: string): Promise<HomeLayout> {
+  if (hasBackend())
+    return normaliseHomeLayout(await invoke<HomeLayout>("home_layout", { account }));
+  return normaliseHomeLayout(
+    JSON.parse(localStorage.getItem(`star-music:home:${account}`) ?? "null"),
+  );
+}
+
+export async function setHomeLayout(account: string, layout: HomeLayout): Promise<HomeLayout> {
+  if (hasBackend()) {
+    return normaliseHomeLayout(await invoke<HomeLayout>("set_home_layout", { account, layout }));
+  }
+  const saved = normaliseHomeLayout(layout);
+  localStorage.setItem(`star-music:home:${account}`, JSON.stringify(saved));
+  return saved;
 }
 
 export async function setPinnedOrder(account: string, ids: string[]): Promise<LibraryOrganisation> {
@@ -1791,6 +1810,7 @@ export async function savePlaylistDetails(
 
 export const keys = {
   libraryOrganisation: (account: string | null) => ["library-organisation", account] as const,
+  homeLayout: (account: string | null) => ["home-layout", account] as const,
   account: ["account"] as const,
   playlists: ["playlists"] as const,
   liked: ["liked-tracks"] as const,

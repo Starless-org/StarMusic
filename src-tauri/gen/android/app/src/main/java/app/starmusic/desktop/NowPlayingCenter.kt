@@ -5,8 +5,10 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -19,6 +21,10 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.media.AudioAttributesCompat
+import androidx.media.AudioFocusRequestCompat
+import androidx.media.AudioManagerCompat
 import java.net.URL
 import java.util.concurrent.Executors
 import org.json.JSONObject
@@ -41,6 +47,15 @@ import org.json.JSONObject
  * song stayed loading until somebody woke the screen. The lock is held while
  * something plays or loads, and kept for a while after — the end of a song
  * reports "not playing" a moment before the page asks for the next one.
+ *
+ * **Android expects a music app to share the speaker, and the app has to say
+ * so itself.** Nothing in librespot's output asks for the audio focus, so a
+ * phone call or another app's video played on top of the song. The session
+ * asks for it when something starts playing, pauses on a loss and comes back
+ * after a short one (a call, a navigation prompt). And when the headphones go
+ * —a cable pulled, a Bluetooth headset switched off— Android announces that
+ * the sound is about to move to the speaker (`ACTION_AUDIO_BECOMING_NOISY`):
+ * the music pauses there, instead of following the person out loud.
  */
 object NowPlayingCenter {
   const val CHANNEL = "playback"
@@ -60,6 +75,8 @@ object NowPlayingCenter {
     val loading: Boolean,
     val positionMs: Long,
     val durationMs: Long,
+    /** Off while the DJ talks: a voice has no bar to drag. */
+    val seekable: Boolean,
   )
 
   private val main = Handler(Looper.getMainLooper())
@@ -71,6 +88,47 @@ object NowPlayingCenter {
   private var artUrl: String? = null
   private var art: Bitmap? = null
   private val release = Runnable { wakeLock?.takeIf { it.isHeld }?.release() }
+
+  private var audio: AudioManager? = null
+  private var focusRequest: AudioFocusRequestCompat? = null
+  /** Held from the first play until the music stops for good or someone else takes it. */
+  private var focused = false
+  /** A short loss paused the music, so getting the focus back resumes it. */
+  private var resumeOnGain = false
+
+  private val onFocus = AudioManager.OnAudioFocusChangeListener { change ->
+    when (change) {
+      AudioManager.AUDIOFOCUS_LOSS -> {
+        // Someone else's music: it is theirs now, and nothing brings ours back.
+        focused = false
+        resumeOnGain = false
+        if (now?.playing == true) key("pause")
+      }
+      AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+        // A call or a voice prompt: pause, and pick it up when it ends.
+        if (now?.playing == true) {
+          resumeOnGain = true
+          key("pause")
+        }
+      }
+      AudioManager.AUDIOFOCUS_GAIN -> {
+        if (resumeOnGain && now?.playing == false) key("play")
+        resumeOnGain = false
+      }
+      // CAN_DUCK: Android lowers a media stream by itself from 8.0 on.
+    }
+  }
+
+  /** The headphones are gone and the sound is about to come out of the speaker. */
+  private val noisy = object : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+      if (intent.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+      resumeOnGain = false
+      if (now?.playing == true) key("pause")
+    }
+  }
+  /** Where the receiver was registered, to unregister it from the same place. */
+  private var noisyIn: Context? = null
 
   /** What the page calls, as `window.StarMusicMedia`. */
   private class Bridge(private val context: Context) {
@@ -90,16 +148,39 @@ object NowPlayingCenter {
         override fun onPause() = key("pause")
         override fun onSkipToNext() = key("next")
         override fun onSkipToPrevious() = key("previous")
+        override fun onSeekTo(pos: Long) = seek(pos)
       })
     }
     wakeLock = app.getSystemService(PowerManager::class.java)
       .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Star Music:playback")
       .apply { setReferenceCounted(false) }
+    audio = app.getSystemService(AudioManager::class.java)
+    focusRequest = AudioFocusRequestCompat.Builder(AudioManagerCompat.AUDIOFOCUS_GAIN)
+      .setAudioAttributes(
+        AudioAttributesCompat.Builder()
+          .setUsage(AudioAttributesCompat.USAGE_MEDIA)
+          .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
+          .build()
+      )
+      .setOnAudioFocusChangeListener(onFocus, main)
+      .build()
+    // A system broadcast still arrives with NOT_EXPORTED; what that flag closes
+    // is the door to other apps sending a fake one.
+    ContextCompat.registerReceiver(
+      app,
+      noisy,
+      IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+      ContextCompat.RECEIVER_NOT_EXPORTED,
+    )
+    noisyIn = app
   }
 
   fun detach() {
     main.removeCallbacks(release)
     release.run()
+    abandonFocus()
+    noisyIn?.let { runCatching { it.unregisterReceiver(noisy) } }
+    noisyIn = null
     session?.run {
       isActive = false
       release()
@@ -132,11 +213,52 @@ object NowPlayingCenter {
   }
 
   /** A button outside the app: handed to the page as the media key it is. */
-  fun key(name: String) {
+  fun key(name: String, positionMs: Long? = null) {
     val view = webView ?: return
+    val args = if (positionMs == null) "'$name'" else "'$name',$positionMs"
     main.post {
-      view.evaluateJavascript("window.__starMusicMediaKey&&window.__starMusicMediaKey('$name')", null)
+      view.evaluateJavascript("window.__starMusicMediaKey&&window.__starMusicMediaKey($args)", null)
     }
+  }
+
+  /**
+   * The bar on the lock screen or in the notification was dragged.
+   *
+   * The page does the seek, like the bar inside the app. But the session's own
+   * state moves right away: until the page's answer arrives, the lock screen
+   * would draw the bar back where it was, under the person's finger.
+   */
+  private fun seek(positionMs: Long) {
+    val n = now ?: return
+    if (!n.seekable) return
+    val at = positionMs.coerceIn(0, n.durationMs)
+    now = n.copy(positionMs = at)
+    session?.setPlaybackState(state(now!!))
+    key("seek", at)
+  }
+
+  /** Draws the notification again, e.g. after the person allowed notifications. */
+  fun repost(context: Context) {
+    val app = context.applicationContext
+    main.post { post(app) }
+  }
+
+  private fun requestFocus() {
+    if (focused) return
+    val request = focusRequest ?: return
+    val manager = audio ?: return
+    focused = AudioManagerCompat.requestAudioFocus(manager, request) ==
+      AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    // Refused only while a call is on: the music has no place there.
+    if (!focused) key("pause")
+  }
+
+  private fun abandonFocus() {
+    resumeOnGain = false
+    if (!focused) return
+    focused = false
+    val request = focusRequest ?: return
+    audio?.let { AudioManagerCompat.abandonAudioFocusRequest(it, request) }
   }
 
   /** From the bridge, on the WebView's thread: `NowPlaying` as JSON, or "null". */
@@ -159,6 +281,7 @@ object NowPlayingCenter {
         loading = o.optBoolean("loading"),
         positionMs = o.optLong("positionMs"),
         durationMs = o.optLong("durationMs"),
+        seekable = o.optBoolean("seekable") && o.optLong("durationMs") > 0,
       )
     }.getOrNull()
   }
@@ -168,30 +291,20 @@ object NowPlayingCenter {
     val session = session ?: return
     if (next == null) {
       session.isActive = false
+      abandonFocus()
       awake(false)
       post(context)
       return
     }
 
-    session.setPlaybackState(
-      PlaybackStateCompat.Builder()
-        .setActions(
-          PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE or
-            PlaybackStateCompat.ACTION_PLAY_PAUSE or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-        )
-        .setState(
-          when {
-            next.playing -> PlaybackStateCompat.STATE_PLAYING
-            next.loading -> PlaybackStateCompat.STATE_BUFFERING
-            else -> PlaybackStateCompat.STATE_PAUSED
-          },
-          next.positionMs,
-          if (next.playing) 1f else 0f,
-          SystemClock.elapsedRealtime(),
-        )
-        .build()
-    )
+    // A pause keeps the focus: the person may press play again in a minute,
+    // and giving it up would let any notification sound take it. It goes when
+    // nothing is left to play, or when another app takes it.
+    if (next.playing) {
+      resumeOnGain = false
+      requestFocus()
+    }
+    session.setPlaybackState(state(next))
     session.isActive = true
     awake(next.playing || next.loading)
 
@@ -212,6 +325,28 @@ object NowPlayingCenter {
     }
     metadata()
     post(context)
+  }
+
+  private fun state(n: Now): PlaybackStateCompat {
+    var actions = PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE or
+      PlaybackStateCompat.ACTION_PLAY_PAUSE or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+      PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+    // Without it the lock screen still draws the bar, but only to look at:
+    // a finger on it does nothing.
+    if (n.seekable) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
+    return PlaybackStateCompat.Builder()
+      .setActions(actions)
+      .setState(
+        when {
+          n.playing -> PlaybackStateCompat.STATE_PLAYING
+          n.loading -> PlaybackStateCompat.STATE_BUFFERING
+          else -> PlaybackStateCompat.STATE_PAUSED
+        },
+        n.positionMs,
+        if (n.playing) 1f else 0f,
+        SystemClock.elapsedRealtime(),
+      )
+      .build()
   }
 
   private fun metadata() {

@@ -403,6 +403,8 @@ export function PlayerBar({
       noSong || duration <= 0
         ? null
         : (delta) => requestSeek(Math.max(0, Math.min(duration, shownPosition + delta))),
+    seekTo:
+      noSong || duration <= 0 ? null : (at) => requestSeek(Math.max(0, Math.min(duration, at))),
     volumeBy: (delta) => {
       const next = Math.round(
         Math.max(0, Math.min(MAX_VOLUME, askedVolume.current + delta * MAX_VOLUME)),

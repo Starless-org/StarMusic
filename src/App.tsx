@@ -281,6 +281,18 @@ function fadeMask(above: boolean, below: boolean): string | undefined {
 type Detail = { kind: "artist"; artist: Artist } | { kind: "album"; album: Album };
 
 /**
+ * The phone page's entrance for each way it moved. **Written out whole, never
+ * built as `page-${move}`:** Tailwind only emits a utility it finds spelled
+ * out in the source, so the built name shipped the keyframes and no class, and
+ * the pages arrived with no motion at all.
+ */
+const PAGE_ENTRANCE = {
+  forward: "page-forward",
+  back: "page-back",
+  tab: "page-tab",
+} as const;
+
+/**
  * A new order for the queue, with the song that is playing left where it is.
  *
  * Two properties make this usable rather than merely random. The current song
@@ -3302,7 +3314,7 @@ export default function App() {
             plays its entrance (`page-*` in index.css). On the desktop the key
             never changes and the box is only a box.
           */}
-          <div key={pageKey} className={MOBILE ? `page-${pageMove.current}` : undefined}>
+          <div key={pageKey} className={MOBILE ? PAGE_ENTRANCE[pageMove.current] : undefined}>
             {/*
             The heading belongs to the list, and there are four screens that bring
             their own: the words, the playlist, the artist, and Home, whose

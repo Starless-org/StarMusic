@@ -3054,9 +3054,12 @@ export default function App() {
           // thumb, which read as one object instead of two.
           // On the phone: one column, the 12px inset, from below the status bar to
           // above the mini player and the tab bar (72px each with their gap).
+          // The top is the status bar *plus* 12px, not the larger of the two:
+          // `max(12px, inset)` gave 27px on a Galaxy S22 — exactly the status
+          // bar — and the titles and the search field sat against the clock.
           className={
             MOBILE
-              ? `on-ground fixed inset-x-3 top-[max(12px,env(safe-area-inset-top))] ${barPresent ? "bottom-[calc(max(12px,env(safe-area-inset-bottom))+144px)]" : "bottom-[calc(max(12px,env(safe-area-inset-bottom))+72px)]"} overflow-x-hidden overflow-y-auto transition-[bottom] duration-[var(--dur-panel)] ease-[var(--ease-glass)]`
+              ? `on-ground fixed inset-x-3 top-[calc(env(safe-area-inset-top)+12px)] ${barPresent ? "bottom-[calc(max(12px,env(safe-area-inset-bottom))+144px)]" : "bottom-[calc(max(12px,env(safe-area-inset-bottom))+72px)]"} overflow-x-hidden overflow-y-auto transition-[bottom] duration-[var(--dur-panel)] ease-[var(--ease-glass)]`
               : `on-ground content-fade absolute top-[104px] ${barPresent ? "bottom-[144px]" : "bottom-5"} overflow-x-hidden overflow-y-auto pr-3 transition-[left,right,bottom] duration-[var(--dur-panel)] ease-[var(--ease-glass)] ${
                   libraryOpen ? (railOnly ? "left-[112px]" : "left-[280px]") : "left-9"
                 } ${queueOpen ? "right-[280px]" : "right-9"}`

@@ -655,7 +655,7 @@ export function PlayerBar({
             >
               <motion.div
                 style={{ y: sheetY }}
-                className="glass-sheet flex h-full flex-col px-5 pt-[max(16px,env(safe-area-inset-top))] pb-[max(20px,env(safe-area-inset-bottom))]"
+                className="glass-sheet flex h-full flex-col px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-[max(20px,env(safe-area-inset-bottom))]"
               >
                 <div ref={fullSwipe} className="flex min-h-0 flex-1 flex-col">
                   <div className="flex shrink-0 items-center">

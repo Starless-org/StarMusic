@@ -428,6 +428,16 @@ manejador que `media://key`. Cuatro cosas medidas en un Galaxy S22:
   congelada desde 11:38:03, la canción terminó a las 11:39:26 y la siguiente
   arrancó 35 ms después. Para verlo, la consola de la WebView de una build de
   debug: `adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>`.
+  **Lo mismo vale para la cola y el historial.** La estación del DJ y la
+  radio pedían su página siguiente desde un efecto, y `advance` leía la cola
+  del render: con el teléfono en el bolsillo la estación tocaba lo que tenía y
+  se callaba. Y el historial se anotaba desde otro efecto, así que las
+  canciones de segundo plano no quedaban escritas. La cola vive también en
+  `queueRef` (toda escritura pasa por `setQueue`), y la recarga de la estación
+  y el historial corren desde el listener. Medido el 25/11 con la página
+  congelada desde 12:11:25: la tercera canción del DJ arrancó a las 12:17:57,
+  la estación pidió la página siguiente a las 12:18:00, y las tres canciones
+  quedaron en el historial.
 
 ## El frontend
 

@@ -937,7 +937,22 @@ export default function App() {
    */
   const intent = useRef(0);
 
-  const [queue, setQueue] = useState<Queue | null>(null);
+  const [queue, setQueueState] = useState<Queue | null>(null);
+  /**
+   * The same queue, readable right now — from a listener, without a render.
+   *
+   * **A station keeps growing while the phone sleeps.** With the page frozen in
+   * the background (see `loadedRef`), the DJ's and the radio's next pages
+   * still arrive, but the render that would hand them to `advance` does not:
+   * the station played what it had and stopped. Every write goes through
+   * `setQueue`, so this is never behind the state.
+   */
+  const queueRef = useRef<Queue | null>(null);
+  const setQueue = useCallback((next: Queue | null | ((current: Queue | null) => Queue | null)) => {
+    const value = typeof next === "function" ? next(queueRef.current) : next;
+    queueRef.current = value;
+    setQueueState(value);
+  }, []);
   const queueOverride = queue?.tracks ?? null;
   /**
    * Which list the history should say a song came from.
@@ -971,7 +986,7 @@ export default function App() {
             : null;
       setQueue(tracks ? { tracks, lines: {}, source: "list", context } : null);
     },
-    [moveTo],
+    [moveTo, setQueue],
   );
   /**
    * The DJ, while it is being asked for and while it could not be read.
@@ -1041,6 +1056,14 @@ export default function App() {
 
   const libraryTracks = isLiked ? (liked.data ?? []) : (playlistTracks.data ?? []);
   const visibleTracks = queueOverride ?? libraryTracks;
+  /** The screen's list, for `tracksNow`: it only changes with a render, so this keeps up. */
+  const libraryRef = useRef(libraryTracks);
+  libraryRef.current = libraryTracks;
+  /**
+   * `visibleTracks`, as it is now and not as the last render saw it: what the
+   * decisions that can run with the page frozen read (`advance`, `placeOf`).
+   */
+  const tracksNow = useCallback(() => queueRef.current?.tracks ?? libraryRef.current, []);
 
   /**
    * What to say when a playlist will not load.
@@ -1317,7 +1340,12 @@ export default function App() {
         console.error("Star Music: no se pudo reproducir", explain(e));
       });
     },
-    [moveTo, setQueueOverride, setLoadedTrack],
+    [
+      moveTo,
+      setQueueOverride,
+      setLoadedTrack, // El orden de la lista queda guardado: apagar el aleatorio lo devuelve.
+      setQueue,
+    ],
   );
 
   // Only once audio is actually flowing. During the load, `loading` is true and
@@ -1373,25 +1401,36 @@ export default function App() {
       .catch(() => {});
   }, [queryClient]);
 
-  useEffect(() => {
-    const id = status?.trackId ?? null;
+  /**
+   * Called by the player's listener with every status (`onStatusRef`), not
+   * from an effect over `status`.
+   *
+   * **The history is mostly written with the phone in a pocket.** With the
+   * page frozen in the background an effect never runs, and when the page
+   * woke up it saw only the last status: the songs in between had started and
+   * ended without a turn, and were never written. It reads the queue and the
+   * loaded song from their refs for the same reason.
+   */
+  const noteListening = (next: PlaybackStatus) => {
+    const id = next.trackId;
     if (listening.current && listening.current.track.id !== id) flushListening();
     if (!id) return;
     if (!listening.current) {
+      const loaded = loadedRef.current;
       const track =
-        queue?.tracks.find((item) => item.id === id) ??
-        (loadedTrack?.id === id ? loadedTrack : null);
+        queueRef.current?.tracks.find((item) => item.id === id) ??
+        (loaded?.id === id ? loaded : null);
       if (!track) return;
       listening.current = { track, context: historySource.current, heardMs: 0, since: null };
     }
     const turn = listening.current;
-    if (status?.playing && turn.since === null) turn.since = Date.now();
-    if (!status?.playing && turn.since !== null) {
+    if (next.playing && turn.since === null) turn.since = Date.now();
+    if (!next.playing && turn.since !== null) {
       turn.heardMs += Date.now() - turn.since;
       turn.since = null;
     }
-    if (status?.finished) flushListening();
-  }, [status?.trackId, status?.playing, status?.finished, queue, loadedTrack, flushListening]);
+    if (next.finished) flushListening();
+  };
 
   useEffect(() => {
     window.addEventListener("beforeunload", flushListening);
@@ -1675,7 +1714,7 @@ export default function App() {
           console.error("Star Music: la radio no siguió a la lista", explain(e));
         });
     },
-    [queue?.context, visibleTracks, playDirect],
+    [queue?.context, visibleTracks, playDirect, setQueue],
   );
 
   /**
@@ -1752,7 +1791,12 @@ export default function App() {
           radioStarting.current = false;
         });
     },
-    [moveTo, setLoadedTrack],
+    [
+      moveTo,
+      setLoadedTrack, // **La cola es la canción elegida y nada más.** Y es una estación desde el
+      // primer momento, porque la radio la va a seguir llenando.
+      setQueue,
+    ],
   );
 
   /**
@@ -1770,8 +1814,8 @@ export default function App() {
    * primera canción.
    */
   const placeOf = useCallback(
-    (songId: string) => placeOfSong(queueAtRef.current, visibleTracks, songId),
-    [visibleTracks],
+    (songId: string) => placeOfSong(queueAtRef.current, tracksNow(), songId),
+    [tracksNow],
   );
 
   const advance = useCallback(
@@ -1783,11 +1827,17 @@ export default function App() {
       // Sin canción —nada sonando— se usa el lugar recordado: es lo que había
       // antes de que el lugar se resolviera por canción.
       const place = ended ? placeOf(ended) : queueAtRef.current;
+      // **La cola de ahora, no la del último render**: con la página congelada
+      // en el teléfono, las páginas nuevas de la estación sólo están acá
+      // (`queueRef`).
+      const tracks = tracksNow();
+      const source = queueRef.current?.source;
+      const sounding = loadedRef.current;
 
       if (repeat === "one") {
         // **La que está sonando es la del lugar**, no la primera con ese id: la
         // cola puede tener la misma canción dos veces.
-        const current = visibleTracks[place] ?? loadedTrack;
+        const current = tracks[place] ?? sounding;
         if (current) {
           playDirect(current, place);
           return true;
@@ -1799,12 +1849,12 @@ export default function App() {
       // buscarla por su id encuentra la primera: la que ya sonó. Desde ahí, "el
       // siguiente" es una canción del pasado, y la app salta para atrás.
       const at = place + 1;
-      const next = visibleTracks[at];
+      const next = tracks[at];
       if (next) {
         // **La estación pide la canción como la pide el DJ:** primero la frase,
         // si la hay, y después la música. Una lista no tiene frases, y la radio
         // tampoco —la radio es música y nada más—.
-        if (queue?.source === "dj") {
+        if (source === "dj") {
           void playStationTrack(next, at);
           return true;
         }
@@ -1812,8 +1862,8 @@ export default function App() {
         return true;
       }
       // Out of tracks. Only repeat-all brings the first one back.
-      if (repeat === "all" && visibleTracks[0]) {
-        playDirect(visibleTracks[0], 0);
+      if (repeat === "all" && tracks[0]) {
+        playDirect(tracks[0], 0);
         return true;
       }
       // **La lista se acabó y la música no se corta.** Spotify sigue con música
@@ -1823,8 +1873,8 @@ export default function App() {
       // **Una radio que se acaba no se vuelve a sembrar.** Si la cola ya era una
       // radio, la estación llegó al final de lo que el servicio tiene y no hay a
       // dónde ir: seguir sembrando sería una radio de la radio, sin fin.
-      if (queue?.source !== "radio") {
-        const seed = visibleTracks[place] ?? loadedTrack;
+      if (source !== "radio") {
+        const seed = tracks[place] ?? sounding;
         if (seed) {
           continueWithRadio(seed, place);
           return true;
@@ -1832,16 +1882,7 @@ export default function App() {
       }
       return false;
     },
-    [
-      repeat,
-      visibleTracks,
-      loadedTrack,
-      playDirect,
-      queue?.source,
-      playStationTrack,
-      placeOf,
-      continueWithRadio,
-    ],
+    [repeat, tracksNow, playDirect, playStationTrack, placeOf, continueWithRadio],
   );
 
   const advanceOnEnd = (next: PlaybackStatus) => {
@@ -1980,10 +2021,13 @@ export default function App() {
    * while frozen, nothing that it reads changes except through refs.
    */
   onStatusRef.current = (next: PlaybackStatus) => {
+    noteListening(next);
     advanceOnEnd(next);
     releaseOnReplay(next);
     skipOnFailure(next);
     showOnLockScreen(next);
+    // After the advance: the song that just started is what the station counts from.
+    topUpStationRef.current();
   };
 
   const onNext = useCallback(() => {
@@ -2100,7 +2144,7 @@ export default function App() {
     // **El orden nuevo deja la canción que suena adelante**, así que el lugar
     // en la cola también es el primero.
     moveTo(0);
-  }, [shuffle, queue, moveTo]);
+  }, [shuffle, queue, moveTo, setQueue]);
 
   /**
    * Ask once at startup whether there is a newer Star Music.
@@ -2294,7 +2338,7 @@ export default function App() {
         setDjBusy(false);
       }
     },
-    [playStationTrack],
+    [playStationTrack, setQueue],
   );
 
   /**
@@ -2339,11 +2383,19 @@ export default function App() {
    * un render de más por cada uno.
    */
   const stationFetching = useRef(false);
-  useEffect(() => {
+  /**
+   * **Lee la cola de ahora, y la llama también el listener del player.** Con
+   * la página congelada en el teléfono este efecto no corre, y la estación
+   * tocaba lo que tenía y se callaba (ver `queueRef`). El efecto se queda para
+   * lo que pasa sin que el player diga nada: una estación que acaba de llegar.
+   */
+  const topUpStation = () => {
+    const queue = queueRef.current;
     if (!queue || queue.source === "list") return;
     // **La cuenta es de la estación, no del panel.** El panel no tiene "a
     // continuación" mientras no suena nada, y la estación sí tiene que saber
     // cuánto le queda de su página.
+    const stationLeft = Math.max(0, queue.tracks.length - (queueAtRef.current + 1));
     if (stationLeft > DJ_TOP_UP) return;
     if (stationFetching.current) return;
     // **Una estación que todavía no tiene su primera página no pide una
@@ -2386,6 +2438,12 @@ export default function App() {
       .finally(() => {
         stationFetching.current = false;
       });
+  };
+  const topUpStationRef = useRef(topUpStation);
+  topUpStationRef.current = topUpStation;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `queue` and `stationLeft` are the triggers; the function reads the refs they mirror.
+  useEffect(() => {
+    topUpStationRef.current();
   }, [queue, stationLeft]);
 
   /**
@@ -2843,7 +2901,7 @@ export default function App() {
       });
       moveTo(edit.at);
     },
-    [queue, visibleTracks, moveTo],
+    [queue, visibleTracks, moveTo, setQueue],
   );
 
   /**
@@ -2873,7 +2931,7 @@ export default function App() {
       });
       moveTo(edit.at);
     },
-    [queue, moveTo],
+    [queue, moveTo, setQueue],
   );
 
   /**

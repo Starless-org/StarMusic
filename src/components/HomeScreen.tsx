@@ -1,6 +1,9 @@
-import { Lock, Play as PlayIcon, Radio } from "lucide-react";
+import { Check, LayoutGrid, LayoutList, Lock, Pencil, Play as PlayIcon, Radio } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { Fragment, type ReactNode, useRef, useState } from "react";
+import { useBack } from "../lib/back";
+import { type ShelfId, type TileId, useHomeLayout } from "../lib/homeLayout";
+import { addTile, QUICK_MAX, removeTile, shownTiles } from "../lib/homeLayoutModel";
 import type { StringKey } from "../lib/i18n";
 import { useLibraryOrganisation } from "../lib/libraryOrganisation";
 import { SPRING } from "../lib/motion";
@@ -8,6 +11,13 @@ import { type Artist, type HomeStats, isDjCard, type Play, type Playlist } from 
 import { isMobile } from "../lib/version";
 import { ArchivedPlaylists } from "./ArchivedPlaylists";
 import { DjArtwork } from "./DjArtwork";
+import {
+  type PickerOption,
+  QuickAccess,
+  QuickAccessPicker,
+  type QuickTileData,
+  ShelfEditor,
+} from "./HomeEditor";
 import { LikedCover } from "./LikedCover";
 import { cardImage, MediaCard } from "./MediaCard";
 
@@ -102,6 +112,13 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [tab, setTab] = useState<"songs" | "artists">("songs");
   const [showAll, setShowAll] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [picking, setPicking] = useState(false);
+  /** Quick access's "where is everything now", taken right before the view changes. */
+  const quickSnapshot = useRef<(() => void) | null>(null);
+  const { layout, save } = useHomeLayout();
+  // The phone's back button leaves the editor the way it closes any layer.
+  useBack(editing && !picking, () => setEditing(false));
 
   /**
    * Split by who made it, because that is the one distinction the data supports.
@@ -137,10 +154,64 @@ export function HomeScreen({
   for (const playlist of yours) {
     if (!quickIds.includes(playlist.id)) quickIds.push(playlist.id);
   }
-  const quick = quickIds
-    .slice(0, dj ? 4 : 5)
-    .map((id) => byId.get(id))
-    .filter((playlist): playlist is Playlist => Boolean(playlist));
+  // Until the person arranges quick access it fills itself, as it always did:
+  // six tiles. Once arranged, it is theirs, and the app no longer adds to it.
+  const automatic: TileId[] = [
+    "liked",
+    ...(dj ? ["dj"] : []),
+    ...quickIds.slice(0, dj ? 4 : 5).filter((id) => byId.has(id)),
+  ];
+  const tileIds: TileId[] = layout.quick
+    ? shownTiles(layout.quick, (id) => byId.has(id), Boolean(dj))
+    : automatic;
+
+  /** What a tile id draws and opens, or null for one that no longer resolves. */
+  const tileFor = (id: TileId): QuickTileData | null => {
+    if (id === "liked") {
+      return {
+        id,
+        title: t.likedSongs,
+        // The compact heart is drawn for a 64px row; a cover gets the full one.
+        art: layout.view === "covers" ? <LikedCover /> : <LikedCover compact />,
+        onOpen: onOpenLiked,
+      };
+    }
+    if (id === "dj") {
+      if (!dj) return null;
+      return {
+        id,
+        title: dj.name,
+        subtitle: djUnavailable ? t.djUnavailable : djBusy ? t.loading : null,
+        art: <DjArtwork />,
+        onOpen: () => onPlayDj(dj),
+      };
+    }
+    const playlist = byId.get(id);
+    if (!playlist) return null;
+    return {
+      id,
+      title: playlist.name,
+      menuId: playlist.id,
+      art: <PlaylistArt playlist={playlist} />,
+      onOpen: () => onOpenPlaylist(playlist),
+      onPrefetch: onPrefetch ? () => onPrefetch(playlist) : undefined,
+    };
+  };
+  const tiles = tileIds.map(tileFor).filter((tile): tile is QuickTileData => tile !== null);
+
+  /** Every change to quick access is a saved layout from then on. */
+  const saveTiles = (quick: TileId[]) => save({ ...layout, quick });
+  const pickerOptions: PickerOption[] = [
+    { id: "liked", title: t.likedSongs, art: <LikedCover compact /> },
+    ...(dj ? [{ id: "dj" as TileId, title: dj.name, art: <DjArtwork /> }] : []),
+    ...playlists
+      .filter((playlist) => !isDjCard(playlist))
+      .map((playlist) => ({
+        id: playlist.id as TileId,
+        title: playlist.name,
+        art: <PlaylistArt playlist={playlist} />,
+      })),
+  ];
 
   const hasHistory = Boolean(stats?.has_history);
   const shownPlaylists = showAll ? yours : yours.slice(0, PLAYLIST_ROW);
@@ -149,6 +220,329 @@ export function HomeScreen({
   const topArtist = stats?.top_artists[0] ?? null;
   const favourite = stats?.top_tracks[0]?.play ?? null;
   const streak = stats?.streak_days ?? 0;
+
+  // Each shelf on its own, so Home can draw them in the order the person chose
+  // and skip the ones they hid (`home_layout.rs`). Null when it has nothing to show.
+  const keepListeningShelf =
+    hasHistory && stats && stats.recent.length > 0 ? (
+      <section aria-label={t.keepListening}>
+        <h2 className="mb-3 px-1 font-display text-[22px] font-semibold tracking-tight">
+          {t.keepListening}
+        </h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {stats.recent.map((play) => {
+            const source = play.context?.id;
+            const playlist = source && source !== "liked" ? byId.get(source) : undefined;
+            const subtitle = `${play.name} · ${artistNames(play)}`;
+            if (source === "liked") {
+              return (
+                <MediaCard
+                  key={`liked-${play.track_id}`}
+                  title={t.likedSongs}
+                  subtitle={subtitle}
+                  art={<LikedCover />}
+                  playLabel={t.openPlaylist}
+                  onOpen={onOpenLiked}
+                />
+              );
+            }
+            if (playlist) {
+              return (
+                <MediaCard
+                  key={playlist.id}
+                  menuId={playlist.id}
+                  title={playlist.name}
+                  subtitle={subtitle}
+                  imageUrl={cardImage(playlist.images)}
+                  playLabel={t.openPlaylist}
+                  onOpen={() => onOpenPlaylist(playlist)}
+                  onPrefetch={onPrefetch ? () => onPrefetch(playlist) : undefined}
+                />
+              );
+            }
+            return (
+              <MediaCard
+                key={`track-${play.track_id}`}
+                title={play.name}
+                subtitle={artistNames(play)}
+                imageUrl={play.image}
+                playLabel={t.play}
+                onPlay={() => onPlayTrack(play)}
+                onOpen={() => onPlayTrack(play)}
+              />
+            );
+          })}
+        </div>
+      </section>
+    ) : null;
+  const mostPlayedShelf =
+    hasHistory && stats ? (
+      <section aria-label={t.mostPlayed} className="min-w-0">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3 px-1">
+          <div>
+            <h2 className="font-display text-[22px] font-semibold tracking-tight">
+              {t.mostPlayed}
+            </h2>
+            <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-ink-faint">
+              <Lock className="size-3.5" strokeWidth={2} />
+              {t.mostPlayedNote}
+            </p>
+          </div>
+          <div
+            role="tablist"
+            aria-label={t.mostPlayed}
+            className="surface-chip flex gap-1 rounded-pill p-1"
+          >
+            {(["songs", "artists"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+                className={`h-8 rounded-pill px-4 text-[12.5px] font-semibold transition-colors duration-200 ${
+                  tab === key ? "bg-white/14 text-ink" : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                {key === "songs" ? t.tabSongs : t.tabArtists}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ol className="surface-card overflow-hidden rounded-card border border-white/8">
+          {tab === "songs"
+            ? stats.top_tracks.map(({ play, plays }, index) => (
+                <li key={play.track_id} className={index > 0 ? "border-t border-white/8" : ""}>
+                  <button
+                    type="button"
+                    onClick={() => onPlayTrack(play)}
+                    className="group grid w-full grid-cols-[28px_40px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-white/6"
+                  >
+                    <span className="tabular text-right text-[13px] text-ink-faint">
+                      {index + 1}
+                    </span>
+                    <span className="relative size-10 overflow-hidden rounded-[8px] bg-white/8">
+                      {play.image && (
+                        <img
+                          src={play.image}
+                          alt=""
+                          className="size-full object-cover"
+                          loading="lazy"
+                        />
+                      )}
+                      <span className="absolute inset-0 grid place-items-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                        <PlayIcon className="size-4 fill-current" strokeWidth={0} />
+                      </span>
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13.5px] font-semibold">
+                        {play.name}
+                      </span>
+                      <span className="block truncate text-[12.5px] text-ink-muted">
+                        {artistNames(play)}
+                      </span>
+                    </span>
+                    <span className="tabular text-[12px] text-ink-faint">
+                      {plays} {t.playsShort}
+                    </span>
+                  </button>
+                </li>
+              ))
+            : stats.top_artists.map((artist, index) => (
+                <li key={artist.id} className={index > 0 ? "border-t border-white/8" : ""}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenArtist({ id: artist.id, name: artist.name })}
+                    className="grid w-full grid-cols-[28px_40px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-white/6"
+                  >
+                    <span className="tabular text-right text-[13px] text-ink-faint">
+                      {index + 1}
+                    </span>
+                    <span className="size-10 overflow-hidden rounded-pill bg-white/8">
+                      {artist.image && (
+                        <img
+                          src={artist.image}
+                          alt=""
+                          className="size-full object-cover"
+                          loading="lazy"
+                        />
+                      )}
+                    </span>
+                    <span className="truncate text-[13.5px] font-semibold">{artist.name}</span>
+                    <span className="tabular text-[12px] text-ink-faint">
+                      {artist.plays} {t.playsShort}
+                    </span>
+                  </button>
+                </li>
+              ))}
+        </ol>
+      </section>
+    ) : null;
+  const yourWeekShelf =
+    hasHistory && stats ? (
+      <section
+        aria-label={t.yourWeek}
+        className="surface-card flex flex-col gap-5 rounded-card border border-white/8 p-6"
+      >
+        <h2 className="font-display text-[20px] font-semibold tracking-tight">{t.yourWeek}</h2>
+        <div>
+          <p className="tabular text-[40px] leading-none font-medium tracking-tight">
+            {minutesLabel(weekTotal)}
+          </p>
+          <p className="mt-1.5 text-[12.5px] text-ink-muted">{t.weekListened}</p>
+        </div>
+        <div className="grid h-24 grid-cols-7 items-end gap-2" aria-hidden="true">
+          {stats.week_minutes.map((minutes, index) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: seven fixed days, Monday first.
+              key={index}
+              className="flex h-full flex-col items-center justify-end gap-1.5"
+            >
+              <span
+                className="w-full max-w-[18px] rounded-pill"
+                style={{
+                  height: `${Math.max(4, Math.round((minutes / weekMax) * 72))}px`,
+                  background: index === stats.today_index ? "var(--color-accent)" : RAMP[index],
+                  opacity: index > stats.today_index ? 0.25 : 1,
+                }}
+              />
+              <span className="tabular text-[11px] text-ink-faint">{t.weekdaysShort[index]}</span>
+            </div>
+          ))}
+        </div>
+        <dl className="grid grid-cols-2 gap-4">
+          <div>
+            <dt className="text-[12px] text-ink-muted">{t.artistOfMonth}</dt>
+            <dd className="mt-1 truncate text-[14px] font-semibold">{topArtist?.name ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-[12px] text-ink-muted">{t.streak}</dt>
+            <dd className="tabular mt-1 text-[14px] font-semibold">
+              {streak} {streak === 1 ? t.day : t.days}
+            </dd>
+          </div>
+        </dl>
+        {favourite && (
+          <button
+            type="button"
+            onClick={() => onPlayTrack(favourite)}
+            className="flex h-11 items-center justify-center gap-2 rounded-pill bg-accent px-5 text-[14px] font-semibold text-on-accent transition-transform duration-150 active:scale-[0.97]"
+          >
+            <Radio className="size-4 shrink-0" strokeWidth={2} />
+            <span className="truncate">
+              {t.radioOf} {favourite.name}
+            </span>
+          </button>
+        )}
+      </section>
+    ) : null;
+  const yourPlaylistsShelf =
+    yours.length > 0 ? (
+      <section aria-label={t.yourPlaylists}>
+        <div className="mb-3 flex items-baseline justify-between gap-3 px-1">
+          <h2 className="font-display text-[22px] font-semibold tracking-tight">
+            {t.yourPlaylists}
+          </h2>
+          {yours.length > PLAYLIST_ROW && (
+            <button
+              type="button"
+              onClick={() => setShowAll((open) => !open)}
+              className="text-[13px] font-semibold text-ink-muted transition-colors duration-200 hover:text-ink"
+            >
+              {showAll ? t.seeLess : `${t.seeAll} (${yours.length})`}
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          {shownPlaylists.map((playlist) => (
+            <MediaCard
+              key={playlist.id}
+              menuId={playlist.id}
+              title={playlist.name}
+              subtitle={playlistCount(playlist)}
+              imageUrl={cardImage(playlist.images)}
+              playLabel={t.openPlaylist}
+              onOpen={() => onOpenPlaylist(playlist)}
+              onPrefetch={onPrefetch ? () => onPrefetch(playlist) : undefined}
+            />
+          ))}
+        </div>
+      </section>
+    ) : null;
+  // Only drawn when it has something besides the DJ, which quick access offers
+  // and the rail lists. An empty shelf with a heading is a promise the app
+  // cannot keep.
+  const madeForYouShelf = madeForYou.some((playlist) => !isDjCard(playlist)) ? (
+    <section aria-label={t.madeForYou}>
+      <h2 className="mb-3 px-1 font-display text-[22px] font-semibold tracking-tight">
+        {t.madeForYou}
+      </h2>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {madeForYou
+          .filter((playlist) => !isDjCard(playlist))
+          .map((playlist) => (
+            <MediaCard
+              key={playlist.id}
+              menuId={playlist.id}
+              title={playlist.name}
+              subtitle={playlistCount(playlist)}
+              imageUrl={cardImage(playlist.images)}
+              playLabel={t.openPlaylist}
+              onOpen={() => onOpenPlaylist(playlist)}
+              onPrefetch={onPrefetch ? () => onPrefetch(playlist) : undefined}
+            />
+          ))}
+      </div>
+    </section>
+  ) : null;
+
+  const shelfNodes: Record<ShelfId, ReactNode> = {
+    keepListening: keepListeningShelf,
+    mostPlayed: mostPlayedShelf,
+    yourWeek: yourWeekShelf,
+    yourPlaylists: yourPlaylistsShelf,
+    madeForYou: madeForYouShelf,
+  };
+  const shelfNames: Record<ShelfId, string> = {
+    keepListening: t.keepListening,
+    mostPlayed: t.mostPlayed,
+    yourWeek: t.yourWeek,
+    yourPlaylists: t.yourPlaylists,
+    madeForYou: t.madeForYou,
+  };
+  // "Lo más escuchado" and "Tu semana" sit side by side on a wide window, as
+  // they always did, whenever the person keeps them next to each other.
+  const visibleShelves = layout.shelves.filter((shelf) => !shelf.hidden && shelfNodes[shelf.id]);
+  const arranged: ReactNode[] = [];
+  for (let index = 0; index < visibleShelves.length; index++) {
+    const id = visibleShelves[index].id;
+    const next = visibleShelves[index + 1]?.id;
+    if (id === "mostPlayed" && next === "yourWeek") {
+      arranged.push(
+        <div
+          key="stats"
+          className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
+        >
+          {shelfNodes.mostPlayed}
+          {shelfNodes.yourWeek}
+        </div>,
+      );
+      index++;
+    } else if (id === "yourWeek" && next === "mostPlayed") {
+      arranged.push(
+        <div
+          key="stats"
+          className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]"
+        >
+          {shelfNodes.yourWeek}
+          {shelfNodes.mostPlayed}
+        </div>,
+      );
+      index++;
+    } else {
+      arranged.push(<Fragment key={id}>{shelfNodes[id]}</Fragment>);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-11 pb-4">
@@ -195,38 +589,98 @@ export function HomeScreen({
             hello
           )}
         </h1>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <QuickTile title={t.likedSongs} onOpen={onOpenLiked}>
-            <LikedCover compact />
-          </QuickTile>
-          {dj && (
-            <QuickTile
-              title={dj.name}
-              onOpen={() => onPlayDj(dj)}
-              subtitle={djUnavailable ? t.djUnavailable : djBusy ? t.loading : null}
-            >
-              <DjArtwork />
-            </QuickTile>
+        {/*
+          The view switch and the editor's door share one row under the
+          greeting: both are about the tiles right below them.
+        */}
+        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+          {editing ? (
+            <p className="tabular text-[12.5px] text-ink-muted">
+              {t.quickAccessCount
+                .replace("{count}", String(tiles.length))
+                .replace("{max}", String(QUICK_MAX))}
+            </p>
+          ) : (
+            <div title={t.homeView} className="surface-chip relative flex gap-1 rounded-pill p-1">
+              {/*
+                One pill, under whichever view is chosen, sliding between them.
+
+                **A CSS transition, not motion's \`layoutId\`.** The \`layoutId\`
+                pill was computed in JavaScript frame by frame, on the same
+                thread that was saving the layout, re-rendering Home and
+                morphing every tile at that very moment: on the phone it ran at
+                about 30 fps. A CSS \`transform\` transition runs on the
+                compositor, which none of that work can hold up. 44px is one
+                button (40) plus the gap (4).
+              */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1 left-1 h-8 w-10 rounded-pill bg-white/14 transition-transform duration-300 ease-[var(--ease-glass)] will-change-transform motion-reduce:transition-none"
+                style={{ transform: `translateX(${layout.view === "covers" ? 44 : 0}px)` }}
+              />
+              {(["rows", "covers"] as const).map((view) => {
+                const Icon = view === "rows" ? LayoutList : LayoutGrid;
+                const name = view === "rows" ? t.homeViewRows : t.homeViewCovers;
+                return (
+                  <button
+                    key={view}
+                    type="button"
+                    aria-pressed={layout.view === view}
+                    aria-label={name}
+                    title={name}
+                    onClick={() => {
+                      if (layout.view === view) return;
+                      quickSnapshot.current?.();
+                      save({ ...layout, view });
+                    }}
+                    className={`relative grid h-8 w-10 place-items-center rounded-pill transition-colors duration-200 ${
+                      layout.view === view ? "text-ink" : "text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    <Icon className="relative size-4" strokeWidth={2} />
+                  </button>
+                );
+              })}
+            </div>
           )}
-          {quick.map((playlist) => {
-            const image = cardImage(playlist.images);
-            return (
-              <QuickTile
-                key={playlist.id}
-                menuId={playlist.id}
-                title={playlist.name}
-                onOpen={() => onOpenPlaylist(playlist)}
-                onPrefetch={onPrefetch ? () => onPrefetch(playlist) : undefined}
-              >
-                {image ? (
-                  <img src={image} alt="" className="size-full object-cover" loading="lazy" />
-                ) : (
-                  <span className="block size-full bg-white/8" />
-                )}
-              </QuickTile>
-            );
-          })}
+          <button
+            type="button"
+            onClick={() => setEditing((open) => !open)}
+            aria-pressed={editing}
+            className={`flex h-9 items-center gap-2 rounded-pill px-4 text-[13px] font-semibold transition-colors duration-200 ${
+              editing ? "bg-accent text-on-accent" : "surface-chip text-ink-muted hover:text-ink"
+            }`}
+          >
+            {editing ? (
+              <Check className="size-4" strokeWidth={2.4} />
+            ) : (
+              <Pencil className="size-4" strokeWidth={2} />
+            )}
+            {editing ? t.editHomeDone : t.editHome}
+          </button>
         </div>
+        <QuickAccess
+          t={t}
+          tiles={tiles}
+          view={layout.view}
+          editing={editing}
+          max={QUICK_MAX}
+          onReorder={saveTiles}
+          onRemove={(id) => saveTiles(removeTile(tileIds, id))}
+          onAdd={() => setPicking(true)}
+          snapshot={quickSnapshot}
+        />
+        <QuickAccessPicker
+          t={t}
+          open={picking}
+          options={pickerOptions}
+          chosen={tileIds}
+          max={QUICK_MAX}
+          onToggle={(id) =>
+            saveTiles(tileIds.includes(id) ? removeTile(tileIds, id) : addTile(tileIds, id))
+          }
+          onClose={() => setPicking(false)}
+        />
       </motion.section>
 
       {stats && !hasHistory && (
@@ -244,318 +698,26 @@ export function HomeScreen({
         </section>
       )}
 
-      {hasHistory && stats && stats.recent.length > 0 && (
-        <section aria-label={t.keepListening}>
-          <h2 className="mb-3 px-1 font-display text-[22px] font-semibold tracking-tight">
-            {t.keepListening}
-          </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {stats.recent.map((play) => {
-              const source = play.context?.id;
-              const playlist = source && source !== "liked" ? byId.get(source) : undefined;
-              const subtitle = `${play.name} · ${artistNames(play)}`;
-              if (source === "liked") {
-                return (
-                  <MediaCard
-                    key={`liked-${play.track_id}`}
-                    title={t.likedSongs}
-                    subtitle={subtitle}
-                    art={<LikedCover />}
-                    playLabel={t.openPlaylist}
-                    onOpen={onOpenLiked}
-                  />
-                );
-              }
-              if (playlist) {
-                return (
-                  <MediaCard
-                    key={playlist.id}
-                    menuId={playlist.id}
-                    title={playlist.name}
-                    subtitle={subtitle}
-                    imageUrl={cardImage(playlist.images)}
-                    playLabel={t.openPlaylist}
-                    onOpen={() => onOpenPlaylist(playlist)}
-                    onPrefetch={onPrefetch ? () => onPrefetch(playlist) : undefined}
-                  />
-                );
-              }
-              return (
-                <MediaCard
-                  key={`track-${play.track_id}`}
-                  title={play.name}
-                  subtitle={artistNames(play)}
-                  imageUrl={play.image}
-                  playLabel={t.play}
-                  onPlay={() => onPlayTrack(play)}
-                  onOpen={() => onPlayTrack(play)}
-                />
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {hasHistory && stats && (
-        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <section aria-label={t.mostPlayed} className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-3 px-1">
-              <div>
-                <h2 className="font-display text-[22px] font-semibold tracking-tight">
-                  {t.mostPlayed}
-                </h2>
-                <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-ink-faint">
-                  <Lock className="size-3.5" strokeWidth={2} />
-                  {t.mostPlayedNote}
-                </p>
-              </div>
-              <div
-                role="tablist"
-                aria-label={t.mostPlayed}
-                className="surface-chip flex gap-1 rounded-pill p-1"
-              >
-                {(["songs", "artists"] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === key}
-                    onClick={() => setTab(key)}
-                    className={`h-8 rounded-pill px-4 text-[12.5px] font-semibold transition-colors duration-200 ${
-                      tab === key ? "bg-white/14 text-ink" : "text-ink-muted hover:text-ink"
-                    }`}
-                  >
-                    {key === "songs" ? t.tabSongs : t.tabArtists}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <ol className="surface-card overflow-hidden rounded-card border border-white/8">
-              {tab === "songs"
-                ? stats.top_tracks.map(({ play, plays }, index) => (
-                    <li key={play.track_id} className={index > 0 ? "border-t border-white/8" : ""}>
-                      <button
-                        type="button"
-                        onClick={() => onPlayTrack(play)}
-                        className="group grid w-full grid-cols-[28px_40px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-white/6"
-                      >
-                        <span className="tabular text-right text-[13px] text-ink-faint">
-                          {index + 1}
-                        </span>
-                        <span className="relative size-10 overflow-hidden rounded-[8px] bg-white/8">
-                          {play.image && (
-                            <img
-                              src={play.image}
-                              alt=""
-                              className="size-full object-cover"
-                              loading="lazy"
-                            />
-                          )}
-                          <span className="absolute inset-0 grid place-items-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                            <PlayIcon className="size-4 fill-current" strokeWidth={0} />
-                          </span>
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-[13.5px] font-semibold">
-                            {play.name}
-                          </span>
-                          <span className="block truncate text-[12.5px] text-ink-muted">
-                            {artistNames(play)}
-                          </span>
-                        </span>
-                        <span className="tabular text-[12px] text-ink-faint">
-                          {plays} {t.playsShort}
-                        </span>
-                      </button>
-                    </li>
-                  ))
-                : stats.top_artists.map((artist, index) => (
-                    <li key={artist.id} className={index > 0 ? "border-t border-white/8" : ""}>
-                      <button
-                        type="button"
-                        onClick={() => onOpenArtist({ id: artist.id, name: artist.name })}
-                        className="grid w-full grid-cols-[28px_40px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-white/6"
-                      >
-                        <span className="tabular text-right text-[13px] text-ink-faint">
-                          {index + 1}
-                        </span>
-                        <span className="size-10 overflow-hidden rounded-pill bg-white/8">
-                          {artist.image && (
-                            <img
-                              src={artist.image}
-                              alt=""
-                              className="size-full object-cover"
-                              loading="lazy"
-                            />
-                          )}
-                        </span>
-                        <span className="truncate text-[13.5px] font-semibold">{artist.name}</span>
-                        <span className="tabular text-[12px] text-ink-faint">
-                          {artist.plays} {t.playsShort}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-            </ol>
-          </section>
-
-          <section
-            aria-label={t.yourWeek}
-            className="surface-card flex flex-col gap-5 rounded-card border border-white/8 p-6"
-          >
-            <h2 className="font-display text-[20px] font-semibold tracking-tight">{t.yourWeek}</h2>
-            <div>
-              <p className="tabular text-[40px] leading-none font-medium tracking-tight">
-                {minutesLabel(weekTotal)}
-              </p>
-              <p className="mt-1.5 text-[12.5px] text-ink-muted">{t.weekListened}</p>
-            </div>
-            <div className="grid h-24 grid-cols-7 items-end gap-2" aria-hidden="true">
-              {stats.week_minutes.map((minutes, index) => (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: seven fixed days, Monday first.
-                  key={index}
-                  className="flex h-full flex-col items-center justify-end gap-1.5"
-                >
-                  <span
-                    className="w-full max-w-[18px] rounded-pill"
-                    style={{
-                      height: `${Math.max(4, Math.round((minutes / weekMax) * 72))}px`,
-                      background: index === stats.today_index ? "var(--color-accent)" : RAMP[index],
-                      opacity: index > stats.today_index ? 0.25 : 1,
-                    }}
-                  />
-                  <span className="tabular text-[11px] text-ink-faint">
-                    {t.weekdaysShort[index]}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <dl className="grid grid-cols-2 gap-4">
-              <div>
-                <dt className="text-[12px] text-ink-muted">{t.artistOfMonth}</dt>
-                <dd className="mt-1 truncate text-[14px] font-semibold">
-                  {topArtist?.name ?? "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[12px] text-ink-muted">{t.streak}</dt>
-                <dd className="tabular mt-1 text-[14px] font-semibold">
-                  {streak} {streak === 1 ? t.day : t.days}
-                </dd>
-              </div>
-            </dl>
-            {favourite && (
-              <button
-                type="button"
-                onClick={() => onPlayTrack(favourite)}
-                className="flex h-11 items-center justify-center gap-2 rounded-pill bg-accent px-5 text-[14px] font-semibold text-on-accent transition-transform duration-150 active:scale-[0.97]"
-              >
-                <Radio className="size-4 shrink-0" strokeWidth={2} />
-                <span className="truncate">
-                  {t.radioOf} {favourite.name}
-                </span>
-              </button>
-            )}
-          </section>
-        </div>
-      )}
-
-      {yours.length > 0 && (
-        <section aria-label={t.yourPlaylists}>
-          <div className="mb-3 flex items-baseline justify-between gap-3 px-1">
-            <h2 className="font-display text-[22px] font-semibold tracking-tight">
-              {t.yourPlaylists}
-            </h2>
-            {yours.length > PLAYLIST_ROW && (
-              <button
-                type="button"
-                onClick={() => setShowAll((open) => !open)}
-                className="text-[13px] font-semibold text-ink-muted transition-colors duration-200 hover:text-ink"
-              >
-                {showAll ? t.seeLess : `${t.seeAll} (${yours.length})`}
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {shownPlaylists.map((playlist) => (
-              <MediaCard
-                key={playlist.id}
-                menuId={playlist.id}
-                title={playlist.name}
-                subtitle={playlistCount(playlist)}
-                imageUrl={cardImage(playlist.images)}
-                playLabel={t.openPlaylist}
-                onOpen={() => onOpenPlaylist(playlist)}
-                onPrefetch={onPrefetch ? () => onPrefetch(playlist) : undefined}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/*
-        Only drawn when it has something besides the DJ, which already has its
-        quick tile. An empty shelf with a heading is a promise the app cannot keep.
-      */}
-      {madeForYou.some((playlist) => !isDjCard(playlist)) && (
-        <section aria-label={t.madeForYou}>
-          <h2 className="mb-3 px-1 font-display text-[22px] font-semibold tracking-tight">
-            {t.madeForYou}
-          </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {madeForYou
-              .filter((playlist) => !isDjCard(playlist))
-              .map((playlist) => (
-                <MediaCard
-                  key={playlist.id}
-                  menuId={playlist.id}
-                  title={playlist.name}
-                  subtitle={playlistCount(playlist)}
-                  imageUrl={cardImage(playlist.images)}
-                  playLabel={t.openPlaylist}
-                  onOpen={() => onOpenPlaylist(playlist)}
-                  onPrefetch={onPrefetch ? () => onPrefetch(playlist) : undefined}
-                />
-              ))}
-          </div>
-        </section>
+      {editing ? (
+        <ShelfEditor
+          t={t}
+          shelves={layout.shelves}
+          names={shelfNames}
+          onChange={(shelves) => save({ ...layout, shelves })}
+        />
+      ) : (
+        arranged
       )}
     </div>
   );
 }
 
-/** One of the six tiles under the greeting: a square of art and a name. */
-function QuickTile({
-  title,
-  subtitle = null,
-  onOpen,
-  onPrefetch,
-  children,
-  menuId,
-}: {
-  title: string;
-  subtitle?: string | null;
-  onOpen: () => void;
-  onPrefetch?: () => void;
-  children: React.ReactNode;
-  /** The playlist a right-click on the tile opens the menu of (lib/contextMenu.ts). */
-  menuId?: string;
-}) {
-  return (
-    <button
-      type="button"
-      data-playlist-id={menuId}
-      onClick={onOpen}
-      onPointerEnter={onPrefetch}
-      onFocus={onPrefetch}
-      className="arrive flex h-16 items-center gap-3.5 overflow-hidden rounded-[14px] surface-tile pr-4 text-left transition-colors duration-200"
-    >
-      <span className="relative size-16 shrink-0 overflow-hidden">{children}</span>
-      <span className="min-w-0">
-        <span className="block truncate text-[14px] font-semibold">{title}</span>
-        {subtitle && <span className="block truncate text-[12px] text-ink-muted">{subtitle}</span>}
-      </span>
-    </button>
+/** A playlist's cover, filling its square: the tile's art and the picker's. */
+function PlaylistArt({ playlist }: { playlist: Playlist }) {
+  const image = cardImage(playlist.images);
+  return image ? (
+    <img src={image} alt="" className="size-full object-cover" loading="lazy" />
+  ) : (
+    <span className="block size-full bg-white/8" />
   );
 }

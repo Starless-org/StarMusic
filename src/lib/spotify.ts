@@ -683,6 +683,8 @@ export type NowPlaying = {
   loading?: boolean;
   positionMs?: number;
   durationMs?: number;
+  /** Whether the lock screen may drag the bar: off while the DJ talks. */
+  seekable?: boolean;
 };
 
 /**
@@ -699,7 +701,8 @@ export async function mediaSession(now: NowPlaying | null): Promise<void> {
   return invoke<void>("media_session", { now });
 }
 
-export type MediaKey = "play" | "pause" | "next" | "previous";
+/** `seek` comes only from the phone's lock screen, with the position it was dragged to. */
+export type MediaKey = "play" | "pause" | "next" | "previous" | "seek";
 
 /**
  * Subscribe to the media keys — the ones on a keyboard or a headset, and the
@@ -707,7 +710,9 @@ export type MediaKey = "play" | "pause" | "next" | "previous";
  * minimised, because Windows routes them to the media session and not to the
  * focused window (see `media_keys.rs`).
  */
-export function onMediaKey(handler: (key: MediaKey) => void): Promise<UnlistenFn> | null {
+export function onMediaKey(
+  handler: (key: MediaKey, positionMs?: number) => void,
+): Promise<UnlistenFn> | null {
   if (!hasBackend()) return null;
   // The phone's lock screen and headset buttons arrive from Kotlin, which
   // calls this function by name: the same keys, the same handler.
@@ -2080,6 +2085,6 @@ declare global {
     /** `NowPlayingCenter.kt`'s bridge, on Android only: `NowPlaying` as JSON, or "null". */
     StarMusicMedia?: { nowPlaying: (json: string) => void };
     /** What Kotlin calls when a lock-screen, notification or headset button is pressed. */
-    __starMusicMediaKey?: (key: MediaKey) => void;
+    __starMusicMediaKey?: (key: MediaKey, positionMs?: number) => void;
   }
 }

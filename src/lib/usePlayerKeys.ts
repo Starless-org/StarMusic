@@ -17,6 +17,8 @@ export type PlayerActions = {
   previous: (() => void) | null;
   /** Relative, in milliseconds. */
   seekBy: ((deltaMs: number) => void) | null;
+  /** Absolute, in milliseconds: the phone's lock-screen bar. */
+  seekTo: ((positionMs: number) => void) | null;
   /** Relative, as a fraction of full scale. */
   volumeBy: (delta: number) => void;
   toggleMute: () => void;
@@ -123,9 +125,11 @@ export function usePlayerKeys(actions: PlayerActions) {
   }, []);
 
   useEffect(() => {
-    const unlisten = onMediaKey((key) => {
+    const unlisten = onMediaKey((key, positionMs) => {
       const a = latest.current;
-      if (key === "next") a.next?.();
+      if (key === "seek") {
+        if (positionMs !== undefined) a.seekTo?.(positionMs);
+      } else if (key === "next") a.next?.();
       else if (key === "previous") a.previous?.();
       // Windows sends "play" or "pause" from the card, and a headset may send
       // either: the one that matches what is already happening is a no-op.
@@ -163,6 +167,7 @@ export function useMediaSession(
   const album = dj ? "" : (track?.album?.name ?? "");
   const artwork = dj ? null : (coverImage(track?.album?.images)?.url ?? null);
   const on = dj ? true : playing;
+  const seekable = !dj;
   const at = useRef({ positionMs, durationMs });
   at.current = { positionMs, durationMs };
 
@@ -170,7 +175,7 @@ export function useMediaSession(
     void mediaSession(
       title === null
         ? null
-        : { title, artist, album, artwork, playing: on, loading, ...at.current },
+        : { title, artist, album, artwork, playing: on, loading, seekable, ...at.current },
     ).catch(() => {});
-  }, [title, artist, album, artwork, on, loading]);
+  }, [title, artist, album, artwork, on, loading, seekable]);
 }

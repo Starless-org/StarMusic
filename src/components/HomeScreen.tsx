@@ -123,7 +123,6 @@ export function HomeScreen({
   }
 
   const hello = greeting(t, new Date().getHours());
-  const title = userName ? `${hello}, ${userName}` : hello;
 
   // Quick tiles: the saved songs, the DJ, then the lists heard last, then the rail's order.
   const quickIds: string[] = [];
@@ -176,14 +175,25 @@ export function HomeScreen({
         {/*
             On the phone the Settings gear sits at the top right of Home, on the
             line of this title: a long name ran under it. The title stops short
-            of the gear and is a size down, so "Buenas tardes, …" fits in two lines.
+            of the gear and is a size down.
+
+            **The name goes on its own line.** "Buenas tardes, Shordan" on one
+            line broke wherever the width ran out —sometimes after the comma,
+            sometimes not at all— so the greeting read as one long label. The
+            break is chosen instead: the greeting, and under it the person.
         */}
         <h1
           className={`mb-5 px-1 font-display leading-tight font-semibold tracking-tight ${
             isMobile() ? "pr-12 text-[28px]" : "text-[34px]"
           }`}
         >
-          {title}
+          {userName ? (
+            <>
+              {hello},<span className="block">{userName}.</span>
+            </>
+          ) : (
+            hello
+          )}
         </h1>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <QuickTile title={t.likedSongs} onOpen={onOpenLiked}>

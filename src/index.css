@@ -1001,6 +1001,16 @@
   ::-webkit-scrollbar-button {
     display: none;
   }
+
+  /*
+   * **The phone has no scrollbar.** A finger scrolls by dragging the content
+   * itself, so the bar is not a control there, only a grey stripe over the
+   * songs; no phone app draws one. The content still scrolls, and the pill
+   * stays on the desktop, where a mouse grabs it.
+   */
+  :root[data-phone] ::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /*

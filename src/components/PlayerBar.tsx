@@ -1,5 +1,4 @@
 import {
-  ChevronDown,
   ListOrdered,
   Loader2,
   Mic2,
@@ -676,18 +675,21 @@ export function PlayerBar({
                 className="glass-sheet flex h-full flex-col px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-[max(20px,env(safe-area-inset-bottom))]"
               >
                 <div ref={fullSwipe} className="flex min-h-0 flex-1 flex-col">
-                  <div className="flex shrink-0 items-center">
-                    <button
-                      type="button"
-                      onClick={() => setExpanded(false)}
-                      aria-label={t.close}
-                      className="grid size-10 shrink-0 place-items-center rounded-pill text-ink-muted"
-                    >
-                      <ChevronDown className="size-6" strokeWidth={2} />
-                    </button>
-                    <span className="mx-auto h-1 w-10 rounded-pill bg-white/20" aria-hidden />
-                    <span className="size-10 shrink-0" aria-hidden />
-                  </div>
+                  {/*
+                    One way to close it, not two. The arrow and the bar said the
+                    same thing side by side; the bar stays because it is the one
+                    that says "drag me down". It is also a button —a tap closes
+                    it— so a person who does not swipe still has a way out, and
+                    the hit area is the whole strip, not the 4px of the pill.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(false)}
+                    aria-label={t.close}
+                    className="mx-auto grid h-10 w-24 shrink-0 place-items-center"
+                  >
+                    <span className="h-1 w-10 rounded-pill bg-white/20" aria-hidden />
+                  </button>
 
                   <div className="mt-2 min-h-0 flex-1">
                     {view === "lyrics" ? (

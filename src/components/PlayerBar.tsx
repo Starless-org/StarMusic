@@ -413,7 +413,7 @@ export function PlayerBar({
 
   usePlayerKeys({
     toggle: idle || busy ? null : playPause,
-    playing: playing || !!dj,
+    talking: !!dj,
     next: idle ? null : onNext,
     previous: idle ? null : onPrevious,
     seekBy:

@@ -73,11 +73,13 @@ import {
   keys,
   type LibrarySort,
   type LibraryView,
+  lastPlaybackStatus,
   librarySort,
   libraryView,
   listCount,
   loadBackground,
   MIN_LISTENED_MS,
+  mediaSession,
   onAudioKeys,
   onDjVoice,
   onPlaybackStatus,
@@ -122,6 +124,7 @@ import {
   usePlaylistTracks,
 } from "./lib/spotify";
 import { checkForUpdate, newerVersion, subscribeUpdate, updateState } from "./lib/updater";
+import { nowPlayingOf } from "./lib/usePlayerKeys";
 import { useSearch } from "./lib/useSearch";
 import { isMobile } from "./lib/version";
 
@@ -1056,6 +1059,8 @@ export default function App() {
   // Playback state arrives as events, not as a query. Polling a player that only
   // changes when the user presses something is a timer that never earns its keep.
   const [status, setStatus] = useState<PlaybackStatus | null>(null);
+  /** What a status makes the app do; called by the listener itself; assigned further down. */
+  const onStatusRef = useRef<(next: PlaybackStatus) => void>(() => {});
   /**
    * The last track the user asked for.
    *
@@ -1064,7 +1069,23 @@ export default function App() {
    * honest than looking it up again — if the list is stale, the bar shows what was
    * actually played.
    */
-  const [loadedTrack, setLoadedTrack] = useState<Track | null>(null);
+  const [loadedTrack, setLoadedTrackState] = useState<Track | null>(null);
+  /**
+   * The same track, readable right now — from a listener, without a render.
+   *
+   * **On the phone, a page left in the background stops rendering.** A few
+   * minutes after the app goes behind, Android freezes everything the page
+   * schedules for itself —timers, `MessageChannel`, `fetch`, and so React's
+   * renders and effects— and keeps running only what is pushed into it from
+   * outside: the backend's events and the lock screen's keys. What has to
+   * happen then (the next song, the lock screen's card) reads this ref and
+   * not the state, which stays where the last render left it.
+   */
+  const loadedRef = useRef<Track | null>(null);
+  const setLoadedTrack = useCallback((track: Track | null) => {
+    loadedRef.current = track;
+    setLoadedTrackState(track);
+  }, []);
 
   /**
    * Whether the bar is on screen.
@@ -1119,6 +1140,10 @@ export default function App() {
     const unlisten = onPlaybackStatus((next) => {
       heard = true;
       setStatus(next);
+      // **Inside the event, not in an effect.** With the page frozen in the
+      // background an effect never runs, and the song that ended stayed the
+      // last one: see `loadedRef`.
+      onStatusRef.current(next);
       // Play met the refusal: the warning comes back, even after "not now".
       // It is the one moment the person is asking for exactly what it offers.
       if (next.error === "keys_refused") {
@@ -1129,7 +1154,9 @@ export default function App() {
     // promise from the effect would leave a dangling subscription behind.
     void playerStatus()
       .then((next) => {
-        if (!heard) setStatus(next);
+        if (heard) return;
+        setStatus(next);
+        onStatusRef.current(next);
       })
       .catch(() => {});
     return () => {
@@ -1177,7 +1204,7 @@ export default function App() {
     return () => {
       unlisten.then((off) => off());
     };
-  }, [moveTo]);
+  }, [moveTo, setLoadedTrack]);
 
   /**
    * The words for whatever is sounding.
@@ -1234,7 +1261,7 @@ export default function App() {
         console.error("Star Music: no se pudo reproducir", explain(e));
       });
     },
-    [moveTo, visibleTracks],
+    [moveTo, visibleTracks, setLoadedTrack],
   );
 
   /**
@@ -1290,7 +1317,7 @@ export default function App() {
         console.error("Star Music: no se pudo reproducir", explain(e));
       });
     },
-    [moveTo, setQueueOverride],
+    [moveTo, setQueueOverride, setLoadedTrack],
   );
 
   // Only once audio is actually flowing. During the load, `loading` is true and
@@ -1500,7 +1527,7 @@ export default function App() {
         console.error("Star Music: no se pudo reproducir", explain(e));
       });
     },
-    [moveTo, visibleTracks],
+    [moveTo, visibleTracks, setLoadedTrack],
   );
 
   /**
@@ -1563,7 +1590,7 @@ export default function App() {
       // estado guarda lo que dijo el servicio y nada más.
       setDjVoice({ id: voice, speaker: narration?.speaker ?? null, line: narration?.line ?? null });
     },
-    [moveTo],
+    [moveTo, setLoadedTrack],
   );
 
   /**
@@ -1725,7 +1752,7 @@ export default function App() {
           radioStarting.current = false;
         });
     },
-    [moveTo],
+    [moveTo, setLoadedTrack],
   );
 
   /**
@@ -1817,9 +1844,9 @@ export default function App() {
     ],
   );
 
-  useEffect(() => {
-    if (!status?.finished) return;
-    const ended = status.trackId;
+  const advanceOnEnd = (next: PlaybackStatus) => {
+    if (!next.finished) return;
+    const ended = next.trackId;
     if (!ended) return;
     // **El final tiene que ser el de la canción que se está esperando.** El
     // usuario puede apretar siguiente mientras la anterior todavía termina, y
@@ -1835,7 +1862,7 @@ export default function App() {
       // or arriving from a different list — can still take over cleanly.
       advancedRef.current = null;
     }
-  }, [status?.finished, status?.trackId, advance]);
+  };
 
   /**
    * Una canción que vuelve a sonar es un final nuevo esperando.
@@ -1849,12 +1876,12 @@ export default function App() {
    * otra vez, que es el único momento que dice "es otra vuelta de la misma
    * canción".
    */
-  useEffect(() => {
-    if (!status?.playing) return;
+  const releaseOnReplay = (next: PlaybackStatus) => {
+    if (!next.playing) return;
     if (advancedRef.current === null) return;
-    if (advancedRef.current !== status.trackId) return;
+    if (advancedRef.current !== next.trackId) return;
     advancedRef.current = null;
-  }, [status?.playing, status?.trackId]);
+  };
 
   /**
    * Skip past a track that will not play.
@@ -1882,14 +1909,11 @@ export default function App() {
    * backend is opening another player underneath.
    */
   const failures = useRef(0);
-  useEffect(() => {
-    if (status?.playing) failures.current = 0;
-  }, [status?.playing]);
-
-  useEffect(() => {
-    if (!status?.error || !status.trackId) return;
-    if (SESSION_ERRORS.has(status.error)) return;
-    const failed = status.trackId;
+  const skipOnFailure = (next: PlaybackStatus) => {
+    if (next.playing) failures.current = 0;
+    if (!next.error || !next.trackId) return;
+    if (SESSION_ERRORS.has(next.error)) return;
+    const failed = next.trackId;
     // **El error tiene que ser de la canción que se está esperando.** Uno viejo,
     // de una canción que ya se cambió, no salta nada: la app ya está playing
     // otra cosa y saltar sería poner una tercera encima.
@@ -1905,7 +1929,62 @@ export default function App() {
 
     advancedRef.current = failed;
     if (!advance(failed)) advancedRef.current = null;
-  }, [status?.error, status?.trackId, advance]);
+  };
+
+  /**
+   * Tell the phone's lock screen about a song that changed while the page sleeps.
+   *
+   * The card is normally `useMediaSession`'s, from the bar — an effect, so in
+   * the background it froze on the song that ended: the lock screen showed the
+   * old title, and its play/pause button sent the opposite of what was true.
+   * Only while hidden, and only when the song or its state changed: the
+   * position goes with each change and the lock screen moves its own bar.
+   * The DJ talking is left to the bar, which knows what to call it.
+   */
+  const lockScreenSaid = useRef("");
+  useEffect(() => {
+    // The bar may have said something else while the page was in front.
+    const forget = () => {
+      lockScreenSaid.current = "";
+    };
+    document.addEventListener("visibilitychange", forget);
+    return () => document.removeEventListener("visibilitychange", forget);
+  }, []);
+  const showOnLockScreen = (next: PlaybackStatus) => {
+    if (!document.hidden || !window.StarMusicMedia || djPending.current) return;
+    const track = loadedRef.current;
+    if (!track || next.trackId !== track.id) return;
+    const said = `${track.id}|${next.playing}|${next.loading}`;
+    if (said === lockScreenSaid.current) return;
+    lockScreenSaid.current = said;
+    const duration = next.durationMs || track.duration_ms || 0;
+    void mediaSession(
+      nowPlayingOf(track, next.playing, next.loading, next.positionMs, duration),
+    ).catch(() => {});
+  };
+
+  /**
+   * What a status from the player makes the app do: move the queue, and keep
+   * the phone's lock screen up to date.
+   *
+   * **Called by the listener, not by effects.** These used to be four effects
+   * over `status`, and an effect runs after a render. On the phone, a few
+   * minutes after the app goes behind, Android freezes the page's own work —
+   * React's renders included— and only what arrives from outside still runs:
+   * the song ended, Rust said so, the page heard it, and the next one never
+   * came. Measured on a Galaxy S22: the end arrived at 11:08:01 and nothing
+   * played until the phone was unlocked. The guards (`asked`, `advancedRef`)
+   * already made each of these safe to call once per status.
+   *
+   * Reassigned on every render so it reads the queue the screen last had;
+   * while frozen, nothing that it reads changes except through refs.
+   */
+  onStatusRef.current = (next: PlaybackStatus) => {
+    advanceOnEnd(next);
+    releaseOnReplay(next);
+    skipOnFailure(next);
+    showOnLockScreen(next);
+  };
 
   const onNext = useCallback(() => {
     // **Con el DJ hablando, "siguiente" es "cállate y seguí".**
@@ -1942,8 +2021,13 @@ export default function App() {
     // **"Siguiente" avanza desde la canción que está sonando**, y esa se
     // resuelve por id: la lista pudo haber cambiado mientras sonaba, y el
     // número guardado dice dónde estaba, no dónde está.
-    advance(status?.trackId ?? loadedTrack?.id);
-  }, [advance, moveTo, repeat, visibleTracks, playDirect, status?.trackId, loadedTrack]);
+    //
+    // **Y la que está sonando se pregunta al player, no al último render.** En
+    // el teléfono, con la página congelada, el render es de antes de que la
+    // cola avanzara sola: "siguiente" desde la pantalla de bloqueo avanzaba
+    // desde la canción que ya había terminado y volvía a poner la que sonaba.
+    advance(lastPlaybackStatus()?.trackId ?? loadedRef.current?.id);
+  }, [advance, moveTo, repeat, visibleTracks, playDirect, setLoadedTrack]);
 
   const onPrevious = useCallback(() => {
     // The Spotify convention, and the one people already have in their fingers:
@@ -1951,8 +2035,10 @@ export default function App() {
     // the threshold, "previous" on a three-minute song means "skip back" and there
     // is no way to restart what you are listening to.
     const restartAfter = 3_000;
-    if ((status?.positionMs ?? 0) > restartAfter && loadedTrack) {
-      playDirect(loadedTrack, queueAtRef.current);
+    // Read now, not from the render: see `onNext`.
+    const sounding = loadedRef.current;
+    if ((lastPlaybackStatus()?.positionMs ?? 0) > restartAfter && sounding) {
+      playDirect(sounding, queueAtRef.current);
       return;
     }
     // **Atrás es el lugar anterior de la cola**, y no "la canción anterior por
@@ -1963,7 +2049,7 @@ export default function App() {
     else if (repeat === "all" && visibleTracks[visibleTracks.length - 1]) {
       playDirect(visibleTracks[visibleTracks.length - 1], visibleTracks.length - 1);
     }
-  }, [status?.positionMs, loadedTrack, repeat, visibleTracks, playDirect]);
+  }, [repeat, visibleTracks, playDirect]);
 
   /**
    * Shuffle decides the order once, here, instead of at every jump.

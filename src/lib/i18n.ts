@@ -58,6 +58,7 @@ export const strings = {
     navSearch: "Buscar",
     tabLibrary: "Biblioteca",
     backToLibrary: "Volver a la biblioteca",
+    backToHome: "Volver al inicio",
 
     libraryTitle: "Tu biblioteca",
     likedSongs: "Canciones que te gustan",
@@ -623,6 +624,7 @@ export const strings = {
     navSearch: "Search",
     tabLibrary: "Library",
     backToLibrary: "Back to the library",
+    backToHome: "Back to Home",
 
     libraryTitle: "Your library",
     likedSongs: "Liked Songs",

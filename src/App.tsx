@@ -2,7 +2,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ChevronLeft, Search, Settings } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { AlbumScreen } from "./components/AlbumScreen";
 import { ArtistScreen } from "./components/ArtistScreen";
 import { AuthGate } from "./components/AuthGate";
@@ -358,6 +366,22 @@ export default function App() {
   useEffect(() => {
     setLibraryList(false);
   }, [activeItem]);
+  /**
+   * On the phone, the tab a playlist was opened from when it was not the
+   * library's own list: back returns there, and not to a list the person never
+   * saw. `null` is the library's list, which is where a playlist lives.
+   */
+  const [cameFrom, setCameFrom] = useState<MobileTab | null>(null);
+  /** Where Home was scrolled when a playlist was opened from it. */
+  const homeScroll = useRef(0);
+  const restoreScroll = useRef<number | null>(null);
+  /**
+   * Which way the phone's page moved, read by the page's entrance: deeper
+   * comes in from the right, back from the left, and a tab rises in place.
+   * A ref and not state because it is decided in the same click that moves
+   * the page, and the page reads it in that render.
+   */
+  const pageMove = useRef<"forward" | "back" | "tab">("tab");
   const [settingsOpen, setSettingsOpen] = useState(false);
   /**
    * The feedback form lives up here, outside `AuthGate`, because the people who
@@ -2654,6 +2678,8 @@ export default function App() {
 
   const onSelectTab = useCallback(
     (tab: MobileTab) => {
+      pageMove.current = "tab";
+      setCameFrom(null);
       setLyricsOpen(false);
       setDetail(null);
       // A search's results are the search tab's; they would otherwise cover
@@ -2673,10 +2699,41 @@ export default function App() {
    * list, another tab back to Home. Home is where the app starts, and there
    * the button sends the app behind the others (`lib/back.ts`).
    */
+  /**
+   * A playlist opened from Home is opened in the library —that is where its
+   * list lives— and back used to land on the library's list, a screen the
+   * person never passed through. Now it returns where they were, scrolled
+   * where they were.
+   */
+  const openFromHome = useCallback((id: string) => {
+    homeScroll.current = mainRef.current?.scrollTop ?? 0;
+    pageMove.current = "forward";
+    setCameFrom("navHome");
+    setActiveItem(id);
+    // Explicitly, and not only through the effect on `activeItem`: opening
+    // the playlist that was already the active one changes no id, the effect
+    // never ran, and Liked Songs opened onto the library's list instead.
+    setLibraryList(false);
+    setActive("navLibrary");
+    setLyricsOpen(false);
+    setDetail(null);
+  }, []);
+
+  const leavePlaylist = useCallback(() => {
+    pageMove.current = "back";
+    if (cameFrom) {
+      setCameFrom(null);
+      restoreScroll.current = homeScroll.current;
+      setActive(cameFrom);
+    } else setLibraryList(true);
+  }, [cameFrom]);
+
   useBackRoot(() => {
-    if (detail) setDetail(null);
-    else if (mobileTab === "navSearch" && showResults) leaveResults();
-    else if (mobileTab === "navLibrary" && !libraryList) setLibraryList(true);
+    if (detail) {
+      pageMove.current = "back";
+      setDetail(null);
+    } else if (mobileTab === "navSearch" && showResults) leaveResults();
+    else if (mobileTab === "navLibrary" && !libraryList) leavePlaylist();
     else if (mobileTab !== "navHome") onSelectTab("navHome");
     else return false;
     return true;
@@ -2946,16 +3003,47 @@ export default function App() {
    * from, and a stale one is a back button that goes somewhere nobody asked for.
    */
   const openArtist = useCallback((artist: Artist) => {
+    pageMove.current = "forward";
     setDetail({ kind: "artist", artist });
     setLyricsOpen(false);
   }, []);
 
   const openAlbum = useCallback((album: Album) => {
+    pageMove.current = "forward";
     setDetail({ kind: "album", album });
     setLyricsOpen(false);
   }, []);
 
-  const closeDetail = useCallback(() => setDetail(null), []);
+  const closeDetail = useCallback(() => {
+    pageMove.current = "back";
+    setDetail(null);
+  }, []);
+
+  /**
+   * One phone page, for its entrance: a playlist, an artist, a tab. Not the
+   * search's results —they arrive under the field while it is being typed in,
+   * and a new key would take the field away from the keyboard.
+   */
+  const pageKey = MOBILE
+    ? [
+        mobileTab,
+        mobileTab === "navLibrary" && !libraryList ? activeItem : "",
+        detail
+          ? `${detail.kind}:${detail.kind === "artist" ? detail.artist.id : detail.album.id}`
+          : "",
+      ].join("|")
+    : "page";
+
+  /**
+   * A new phone page starts at its top, and the page back to Home starts where
+   * Home was left. Before the paint, so neither is seen jumping.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the page changing is the event.
+  useLayoutEffect(() => {
+    if (!MOBILE) return;
+    mainRef.current?.scrollTo({ top: restoreScroll.current ?? 0 });
+    restoreScroll.current = null;
+  }, [pageKey]);
 
   /**
    * The heading, and the line under it.
@@ -3210,6 +3298,12 @@ export default function App() {
           }
         >
           {/*
+            The phone's page, keyed by where it is, so arriving somewhere new
+            plays its entrance (`page-*` in index.css). On the desktop the key
+            never changes and the box is only a box.
+          */}
+          <div key={pageKey} className={MOBILE ? `page-${pageMove.current}` : undefined}>
+            {/*
             The heading belongs to the list, and there are four screens that bring
             their own: the words, the playlist, the artist, and Home, whose
             greeting is its title. It used to stay for
@@ -3217,145 +3311,140 @@ export default function App() {
             underneath in the panel, and between them a subtitle counting the songs
             of a playlist nobody could see.
           */}
-          {/*
+            {/*
             The phone's Settings: a gear on Home, top right, instead of a tab
             (DESIGN.md, "The phone").
           */}
-          {MOBILE && isHome && !showResults && (
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              aria-label={t.navSettings}
-              className="absolute top-1 right-1 z-10 grid size-11 place-items-center rounded-pill text-ink-muted active:scale-[0.94]"
-            >
-              <Settings className="size-[22px]" strokeWidth={2} />
-            </button>
-          )}
-
-          {/* The phone's search field, at the top of its own tab. */}
-          {MOBILE && mobileTab === "navSearch" && (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                onSubmitSearch();
-              }}
-              className="glass-control mb-4 flex h-12 items-center gap-2.5 rounded-pill px-4"
-            >
-              <Search className="size-[18px] shrink-0 text-ink-muted" strokeWidth={2} />
-              <input
-                type="search"
-                enterKeyHint="search"
-                value={draft}
-                onChange={(event) => onQueryChange(event.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label={t.searchPlaceholder}
-                className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-ink-faint"
-              />
-            </form>
-          )}
-
-          {/* Back from a playlist to the phone's library list. */}
-          {MOBILE && mobileTab === "navLibrary" && !libraryList && !detail && (
-            <button
-              type="button"
-              onClick={() => setLibraryList(true)}
-              className="-ml-2 mb-2 flex items-center gap-1 rounded-pill py-1.5 pr-3 pl-1 text-[13.5px] font-medium text-ink-muted"
-            >
-              <ChevronLeft className="size-5" strokeWidth={2} />
-              {t.backToLibrary}
-            </button>
-          )}
-
-          {!lyricsInMain &&
-            !mobileLibraryList &&
-            !mobileSearchIdle &&
-            !playlistScreen &&
-            !likedScreen &&
-            !detail &&
-            !(isHome && !showResults) && (
-              <motion.header
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={SPRING}
-                className="mb-5"
+            {MOBILE && isHome && !showResults && (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                aria-label={t.navSettings}
+                className="absolute top-1 right-1 z-10 grid size-11 place-items-center rounded-pill text-ink-muted active:scale-[0.94]"
               >
-                <h1 className="truncate text-[30px] leading-tight font-semibold tracking-tight">
-                  {headerTitle}
-                </h1>
-                <p className="tabular mt-1 truncate text-[13px] text-ink-muted">{headerSubtitle}</p>
-              </motion.header>
+                <Settings className="size-[22px]" strokeWidth={2} />
+              </button>
             )}
 
-          {mobileLibraryList ? (
-            <MobileLibrary
-              t={t}
-              playlists={orderedPlaylists}
-              likedCount={liked.data?.length ?? null}
-              error={Boolean(playlists.error ?? account.error) && !playlists.isLoading}
-              onSelect={(id) => {
-                onSelectFromRail(id);
-                // The DJ card plays instead of opening: the list stays.
-                const card = orderedPlaylists.find((playlist) => playlist.id === id);
-                if (!(card && isDjCard(card))) setLibraryList(false);
-              }}
-            />
-          ) : mobileSearchIdle ? null : lyricsInMain ? (
-            /*
+            {/* The phone's search field, at the top of its own tab. */}
+            {MOBILE && mobileTab === "navSearch" && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onSubmitSearch();
+                }}
+                className="glass-control mb-4 flex h-12 items-center gap-2.5 rounded-pill px-4"
+              >
+                <Search className="size-[18px] shrink-0 text-ink-muted" strokeWidth={2} />
+                <input
+                  type="search"
+                  enterKeyHint="search"
+                  value={draft}
+                  onChange={(event) => onQueryChange(event.target.value)}
+                  placeholder={t.searchPlaceholder}
+                  aria-label={t.searchPlaceholder}
+                  className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-ink-faint"
+                />
+              </form>
+            )}
+
+            {/* Back from a playlist to the phone's library list. */}
+            {MOBILE && mobileTab === "navLibrary" && !libraryList && !detail && (
+              <button
+                type="button"
+                onClick={leavePlaylist}
+                className="-ml-2 mb-2 flex items-center gap-1 rounded-pill py-1.5 pr-3 pl-1 text-[13.5px] font-medium text-ink-muted"
+              >
+                <ChevronLeft className="size-5" strokeWidth={2} />
+                {cameFrom === "navHome" ? t.backToHome : t.backToLibrary}
+              </button>
+            )}
+
+            {!lyricsInMain &&
+              !mobileLibraryList &&
+              !mobileSearchIdle &&
+              !playlistScreen &&
+              !likedScreen &&
+              !detail &&
+              !(isHome && !showResults) && (
+                <motion.header
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={SPRING}
+                  className="mb-5"
+                >
+                  <h1 className="truncate text-[30px] leading-tight font-semibold tracking-tight">
+                    {headerTitle}
+                  </h1>
+                  <p className="tabular mt-1 truncate text-[13px] text-ink-muted">
+                    {headerSubtitle}
+                  </p>
+                </motion.header>
+              )}
+
+            {mobileLibraryList ? (
+              <MobileLibrary
+                t={t}
+                playlists={orderedPlaylists}
+                likedCount={liked.data?.length ?? null}
+                error={Boolean(playlists.error ?? account.error) && !playlists.isLoading}
+                onSelect={(id) => {
+                  onSelectFromRail(id);
+                  // The DJ card plays instead of opening: the list stays.
+                  const card = orderedPlaylists.find((playlist) => playlist.id === id);
+                  if (!(card && isDjCard(card))) {
+                    pageMove.current = "forward";
+                    setLibraryList(false);
+                  }
+                }}
+              />
+            ) : mobileSearchIdle ? null : lyricsInMain ? (
+              /*
               The words replace the list rather than opening over it. DESIGN.md
               allows four floating layers and the queue already has one, and the
               lyrics are only worth reading with the transport right there — which
               it always is, on the player bar.
             */
-            <LyricsPanel {...desktopLyrics} />
-          ) : showResults ? (
-            results ? (
-              <SearchScreen
+              <LyricsPanel {...desktopLyrics} />
+            ) : showResults ? (
+              results ? (
+                <SearchScreen
+                  t={t}
+                  tracks={results}
+                  nowPlayingId={nowPlayingId}
+                  loadingId={loadingId}
+                  failedId={failedId}
+                  onPlay={playRadio}
+                  onOpenArtist={openArtist}
+                  onAddToQueue={onAddToQueue}
+                  onNewPlaylist={openNaming}
+                  onAddToJam={onAddToJam}
+                />
+              ) : (
+                <p className="surface-card rounded-card border border-white/8 px-5 py-6 text-center text-[13px] text-ink-faint">
+                  {resultsLoading ? t.searching : (screenError ?? t.searchNoResults)}
+                </p>
+              )
+            ) : isHome ? (
+              <HomeScreen
                 t={t}
-                tracks={results}
-                nowPlayingId={nowPlayingId}
-                loadingId={loadingId}
-                failedId={failedId}
-                onPlay={playRadio}
+                playlists={orderedPlaylists}
+                loading={playlists.isLoading}
+                error={playlists.error ? explain(playlists.error) : null}
+                playlistCount={(playlist) => `${playlist.tracks?.total ?? 0} ${t.songs}`}
+                onPlayDj={onPlayDj}
+                djBusy={djBusy}
+                djUnavailable={djUnavailable}
+                stats={homeStats.data ?? null}
+                userName={account.data?.display_name ?? null}
+                onPlayTrack={(play) => playRadio(trackFromPlay(play))}
                 onOpenArtist={openArtist}
-                onAddToQueue={onAddToQueue}
-                onNewPlaylist={openNaming}
-                onAddToJam={onAddToJam}
+                onOpenLiked={() => openFromHome("liked")}
+                onOpenPlaylist={(playlist) => openFromHome(playlist.id)}
+                onPrefetch={(playlist) => onPrefetchPlaylist(playlist.id)}
               />
-            ) : (
-              <p className="surface-card rounded-card border border-white/8 px-5 py-6 text-center text-[13px] text-ink-faint">
-                {resultsLoading ? t.searching : (screenError ?? t.searchNoResults)}
-              </p>
-            )
-          ) : isHome ? (
-            <HomeScreen
-              t={t}
-              playlists={orderedPlaylists}
-              loading={playlists.isLoading}
-              error={playlists.error ? explain(playlists.error) : null}
-              playlistCount={(playlist) => `${playlist.tracks?.total ?? 0} ${t.songs}`}
-              onPlayDj={onPlayDj}
-              djBusy={djBusy}
-              djUnavailable={djUnavailable}
-              stats={homeStats.data ?? null}
-              userName={account.data?.display_name ?? null}
-              onPlayTrack={(play) => playRadio(trackFromPlay(play))}
-              onOpenArtist={openArtist}
-              onOpenLiked={() => {
-                setActiveItem("liked");
-                setActive("navLibrary");
-                setLyricsOpen(false);
-                setDetail(null);
-              }}
-              onOpenPlaylist={(playlist) => {
-                setActiveItem(playlist.id);
-                setActive("navLibrary");
-                setLyricsOpen(false);
-                setDetail(null);
-              }}
-              onPrefetch={(playlist) => onPrefetchPlaylist(playlist.id)}
-            />
-          ) : detail ? (
-            /*
+            ) : detail ? (
+              /*
               A page about one artist or one album, over everything that was on
               screen and with its own back button. It is a destination and not a
               filter: the rail, the queue and the transport all stay exactly where
@@ -3367,29 +3456,29 @@ export default function App() {
               Splitting them here would mean the next thing added to one of them
               has to be remembered for the other.
             */
-            detail.kind === "artist" ? (
-              <ArtistScreen
-                t={t}
-                artist={detail.artist}
-                nowPlayingId={nowPlayingId}
-                loadingId={loadingId}
-                failedId={failedId}
-                onPlay={playFrom}
-                onBack={closeDetail}
-              />
-            ) : (
-              <AlbumScreen
-                t={t}
-                album={detail.album}
-                nowPlayingId={nowPlayingId}
-                loadingId={loadingId}
-                failedId={failedId}
-                onPlay={playFrom}
-                onBack={closeDetail}
-              />
-            )
-          ) : isLiked ? (
-            /*
+              detail.kind === "artist" ? (
+                <ArtistScreen
+                  t={t}
+                  artist={detail.artist}
+                  nowPlayingId={nowPlayingId}
+                  loadingId={loadingId}
+                  failedId={failedId}
+                  onPlay={playFrom}
+                  onBack={closeDetail}
+                />
+              ) : (
+                <AlbumScreen
+                  t={t}
+                  album={detail.album}
+                  nowPlayingId={nowPlayingId}
+                  loadingId={loadingId}
+                  failedId={failedId}
+                  onPlay={playFrom}
+                  onBack={closeDetail}
+                />
+              )
+            ) : isLiked ? (
+              /*
               Liked Songs on the playlist's screen, with `playlist={null}`.
 
               It used to always play shuffled, whatever the shuffle button said.
@@ -3397,35 +3486,35 @@ export default function App() {
               `playlistContext` is `null` here on purpose: the saved songs are not
               a playlist, so the radio seeds from the last song that played.
             */
-            <PlaylistScreen
-              t={t}
-              lang={lang}
-              playlist={null}
-              account={account.data ?? null}
-              tracks={libraryTracks}
-              nowPlayingId={nowPlayingId}
-              loadingId={loadingId}
-              failedId={failedId}
-              onPlay={(list, track) => playFrom(list, track, playlistContext)}
-              onShuffle={(list, track) => playShuffled(list, track, playlistContext)}
-              onOpenArtist={openArtist}
-              onOpenAlbum={openAlbum}
-              onAddToQueue={onAddToQueue}
-              onNewPlaylist={openNaming}
-              onAddToJam={onAddToJam}
-              onAddListToQueue={onAddListToQueue}
-              prefs={trackPrefs}
-              onPrefsChange={changeTrackPrefs}
-              shuffle={shuffle}
-              onToggleShuffle={onToggleShuffle}
-              playing={playlistPlaying}
-              onPlayPause={onPlaylistPlayPause}
-              loading={liked.isLoading}
-              error={liked.error ? explain(liked.error) : null}
-              empty={!liked.isLoading ? t.likedEmpty : null}
-            />
-          ) : playlistScreen && selected ? (
-            /*
+              <PlaylistScreen
+                t={t}
+                lang={lang}
+                playlist={null}
+                account={account.data ?? null}
+                tracks={libraryTracks}
+                nowPlayingId={nowPlayingId}
+                loadingId={loadingId}
+                failedId={failedId}
+                onPlay={(list, track) => playFrom(list, track, playlistContext)}
+                onShuffle={(list, track) => playShuffled(list, track, playlistContext)}
+                onOpenArtist={openArtist}
+                onOpenAlbum={openAlbum}
+                onAddToQueue={onAddToQueue}
+                onNewPlaylist={openNaming}
+                onAddToJam={onAddToJam}
+                onAddListToQueue={onAddListToQueue}
+                prefs={trackPrefs}
+                onPrefsChange={changeTrackPrefs}
+                shuffle={shuffle}
+                onToggleShuffle={onToggleShuffle}
+                playing={playlistPlaying}
+                onPlayPause={onPlaylistPlayPause}
+                loading={liked.isLoading}
+                error={liked.error ? explain(liked.error) : null}
+                empty={!liked.isLoading ? t.likedEmpty : null}
+              />
+            ) : playlistScreen && selected ? (
+              /*
               The playlist as the client everybody knows draws one: artwork, name,
               who made it, how many songs and how long it runs, then the songs with
               the album and the day each one joined.
@@ -3436,66 +3525,67 @@ export default function App() {
               the user is looking at and the queue behind the song are the same
               array, by construction, and not by two props happening to agree.
             */
-            <PlaylistScreen
-              t={t}
-              lang={lang}
-              playlist={selected}
-              account={account.data ?? null}
-              tracks={libraryTracks}
-              nowPlayingId={nowPlayingId}
-              loadingId={loadingId}
-              failedId={failedId}
-              onPlay={(list, track) => playFrom(list, track, playlistContext)}
-              onShuffle={(list, track) => playShuffled(list, track, playlistContext)}
-              onOpenArtist={openArtist}
-              onOpenAlbum={openAlbum}
-              onAddToQueue={onAddToQueue}
-              onNewPlaylist={openNaming}
-              onAddToJam={onAddToJam}
-              // Los tres puntos de la playlist: la lista entera va a la cola, y
-              // los detalles son un diálogo aparte.
-              onAddListToQueue={onAddListToQueue}
-              prefs={trackPrefs}
-              onPrefsChange={changeTrackPrefs}
-              // The two controls the playlist shares with the transport, handed the
-              // transport's own state and handlers. Two shuffle buttons showing two
-              // different answers is the thing this cannot be.
-              shuffle={shuffle}
-              onToggleShuffle={onToggleShuffle}
-              playing={playlistPlaying}
-              onPlayPause={onPlaylistPlayPause}
-              loading={playlistTracks.isLoading}
-              error={playlistError}
-              empty={!playlistTracks.isLoading ? t.playlistEmpty : null}
-            />
-          ) : (
-            // A playlist the user does not own 404s, and a playlist with no tracks
-            // is a real empty state rather than a loading one — both need to say
-            // something different from "cargando". This is also what a playlist
-            // shows for the moment between being opened by id and being found in
-            // the library, which is exactly the loading state and nothing more.
-            <TrackList
-              tracks={libraryTracks}
-              t={t}
-              nowPlayingId={nowPlayingId}
-              loadingId={loadingId}
-              failedId={failedId}
-              // This list defines the queue, and it has to say so *here* as well
-              // and not only when the playlist was opened: opening one leaves the
-              // queue alone, so playing a song inside the playlist on screen is
-              // what replaces it. Before, it left the previous queue standing — open a shuffled
-              // run from Home, click a song in "LoL", and the songs after it came
-              // from the old list. The drift the queue design exists to prevent.
-              onPlay={(track) => playFrom(libraryTracks, track, playlistContext)}
-              loading={playlistTracks.isLoading}
-              error={playlistError}
-              empty={!playlistTracks.isLoading ? t.playlistEmpty : null}
-            />
-          )}
+              <PlaylistScreen
+                t={t}
+                lang={lang}
+                playlist={selected}
+                account={account.data ?? null}
+                tracks={libraryTracks}
+                nowPlayingId={nowPlayingId}
+                loadingId={loadingId}
+                failedId={failedId}
+                onPlay={(list, track) => playFrom(list, track, playlistContext)}
+                onShuffle={(list, track) => playShuffled(list, track, playlistContext)}
+                onOpenArtist={openArtist}
+                onOpenAlbum={openAlbum}
+                onAddToQueue={onAddToQueue}
+                onNewPlaylist={openNaming}
+                onAddToJam={onAddToJam}
+                // Los tres puntos de la playlist: la lista entera va a la cola, y
+                // los detalles son un diálogo aparte.
+                onAddListToQueue={onAddListToQueue}
+                prefs={trackPrefs}
+                onPrefsChange={changeTrackPrefs}
+                // The two controls the playlist shares with the transport, handed the
+                // transport's own state and handlers. Two shuffle buttons showing two
+                // different answers is the thing this cannot be.
+                shuffle={shuffle}
+                onToggleShuffle={onToggleShuffle}
+                playing={playlistPlaying}
+                onPlayPause={onPlaylistPlayPause}
+                loading={playlistTracks.isLoading}
+                error={playlistError}
+                empty={!playlistTracks.isLoading ? t.playlistEmpty : null}
+              />
+            ) : (
+              // A playlist the user does not own 404s, and a playlist with no tracks
+              // is a real empty state rather than a loading one — both need to say
+              // something different from "cargando". This is also what a playlist
+              // shows for the moment between being opened by id and being found in
+              // the library, which is exactly the loading state and nothing more.
+              <TrackList
+                tracks={libraryTracks}
+                t={t}
+                nowPlayingId={nowPlayingId}
+                loadingId={loadingId}
+                failedId={failedId}
+                // This list defines the queue, and it has to say so *here* as well
+                // and not only when the playlist was opened: opening one leaves the
+                // queue alone, so playing a song inside the playlist on screen is
+                // what replaces it. Before, it left the previous queue standing — open a shuffled
+                // run from Home, click a song in "LoL", and the songs after it came
+                // from the old list. The drift the queue design exists to prevent.
+                onPlay={(track) => playFrom(libraryTracks, track, playlistContext)}
+                loading={playlistTracks.isLoading}
+                error={playlistError}
+                empty={!playlistTracks.isLoading ? t.playlistEmpty : null}
+              />
+            )}
 
-          {account.data && account.data.product !== "premium" && (
-            <p className="mt-5 text-[12px] text-warn-ink">{t.premiumRequired}</p>
-          )}
+            {account.data && account.data.product !== "premium" && (
+              <p className="mt-5 text-[12px] text-warn-ink">{t.premiumRequired}</p>
+            )}
+          </div>
         </main>
 
         {!MOBILE && (

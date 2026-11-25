@@ -693,6 +693,57 @@
 }
 
 /*
+ * The phone's page arriving (App.tsx, `pageKey`): going deeper comes in from
+ * the right, back comes in from the left, and a tab rises in place. Opacity
+ * on the page is safe here and only here: on the phone nothing inside `<main>`
+ * frosts (see `:root[data-phone] main` below), so there is no blur for a fading
+ * parent to take away. Transform and opacity only, so the compositor plays it.
+ */
+@keyframes page-forward {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes page-back {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+}
+
+@keyframes page-tab {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@utility page-forward {
+  animation: page-forward 340ms var(--ease-glass) both;
+}
+
+@utility page-back {
+  animation: page-back 340ms var(--ease-glass) both;
+}
+
+@utility page-tab {
+  animation: page-tab 260ms var(--ease-glass) both;
+}
+
+/* The tab bar's icon, when its tab becomes the one you are on. */
+@keyframes tab-pop {
+  40% {
+    transform: scale(1.18);
+  }
+}
+
+@utility tab-pop {
+  animation: tab-pop 360ms var(--ease-glass);
+}
+
+/*
  * Text that stands on the person's picture, with no surface under it.
  *
  * The grey tokens were measured against Night, and a subtitle under a cover or the

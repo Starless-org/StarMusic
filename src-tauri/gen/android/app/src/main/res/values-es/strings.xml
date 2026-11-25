@@ -1,6 +1,6 @@
 <resources>
     <string name="keepalive_channel">"Reproducción"</string>
-    <string name="keepalive_text">"Sigue funcionando en segundo plano"</string>
+    <string name="keepalive_text">"Esperando que inicies sesión"</string>
     <string name="media_previous">"Anterior"</string>
     <string name="media_play">"Reproducir"</string>
     <string name="media_pause">"Pausar"</string>

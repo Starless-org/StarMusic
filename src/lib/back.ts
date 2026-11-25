@@ -23,8 +23,11 @@ let listening = false;
 
 declare global {
   interface Window {
-    /** `MainActivity`'s bridge: moves the app behind the others without closing it. */
-    StarMusicAndroid?: { moveToBack: () => void };
+    /**
+     * `MainActivity`'s bridge: moves the app behind the others without closing
+     * it, and keeps its network through the login (`AuthGate.tsx`).
+     */
+    StarMusicAndroid?: { moveToBack: () => void; holdForLogin: (on: boolean) => void };
   }
 }
 

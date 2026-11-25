@@ -19,7 +19,9 @@ import androidx.core.app.ServiceCompat
  * See `docs/android.md`.
  *
  * Its notification is the media notification: `NowPlayingCenter` fills it
- * with the song once there is one.
+ * with the song once there is one. It is started and stopped by
+ * `NowPlayingCenter.keepAlive` —only while music or a login needs it— so a
+ * notification with nothing in it is the login's, and only lasts that long.
  */
 class KeepAliveService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null

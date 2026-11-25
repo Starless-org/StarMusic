@@ -264,6 +264,10 @@ export function AuthGate({
     setBusy(true);
     setStep("browser");
     setError(null);
+    // On the phone the browser leaves the app behind, and Android takes the
+    // network from an app behind: the callback would never arrive. Holding the
+    // foreground service for the length of the login keeps it (`MainActivity.kt`).
+    window.StarMusicAndroid?.holdForLogin(true);
     try {
       await invoke<AuthStatus>("begin_login");
     } catch (e) {
@@ -271,6 +275,8 @@ export function AuthGate({
       setBusy(false);
       setStep(null);
       return;
+    } finally {
+      window.StarMusicAndroid?.holdForLogin(false);
     }
     // **El botón se queda working hasta que la sesión esté de verdad.**
     //

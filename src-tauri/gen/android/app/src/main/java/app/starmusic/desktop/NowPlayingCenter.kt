@@ -130,6 +130,48 @@ object NowPlayingCenter {
   /** Where the receiver was registered, to unregister it from the same place. */
   private var noisyIn: Context? = null
 
+  /** The login's browser is in front and its callback has not arrived. */
+  private var loggingIn = false
+  /** Whether `KeepAliveService` was started and not stopped since. */
+  private var running = false
+
+  /** From the page, through `MainActivity`'s bridge: the login opened or closed. */
+  fun login(context: Context, on: Boolean) {
+    val app = context.applicationContext
+    main.post {
+      loggingIn = on
+      keepAlive(app)
+    }
+  }
+
+  /**
+   * Starts the foreground service while there is a reason for it, and stops it
+   * when there is none.
+   *
+   * **The service used to start with the app, and its notification said so.**
+   * With nothing playing, the shade kept a "Running in the background" that
+   * told the person nothing they could use. Only two moments need it: music
+   * —with the screen off the process must live, and its notification is
+   * then the song's— and the login, whose browser leaves the app in the
+   * background without network. Outside of them there is no notification.
+   *
+   * Both start from the app in front (a tap on a song, the login button), which
+   * is when Android allows it. A start it refuses —the app already behind— is
+   * not retried: the music that needed it would already be playing under a
+   * running service.
+   */
+  private fun keepAlive(context: Context) {
+    val want = loggingIn || now != null
+    if (want == running) return
+    val intent = Intent(context, KeepAliveService::class.java)
+    if (want) {
+      running = runCatching { ContextCompat.startForegroundService(context, intent) }.isSuccess
+    } else {
+      context.stopService(intent)
+      running = false
+    }
+  }
+
   /** What the page calls, as `window.StarMusicMedia`. */
   private class Bridge(private val context: Context) {
     /** `NowPlaying` as JSON, or "null". See `mediaSession` in `src/lib/spotify.ts`. */
@@ -181,6 +223,9 @@ object NowPlayingCenter {
     abandonFocus()
     noisyIn?.let { runCatching { it.unregisterReceiver(noisy) } }
     noisyIn = null
+    // `MainActivity.onDestroy` stops the service itself.
+    running = false
+    loggingIn = false
     session?.run {
       isActive = false
       release()
@@ -289,11 +334,14 @@ object NowPlayingCenter {
   private fun show(context: Context, next: Now?) {
     now = next
     val session = session ?: return
+    keepAlive(context)
     if (next == null) {
       session.isActive = false
       abandonFocus()
       awake(false)
-      post(context)
+      // During a login the service's notification stays; otherwise nothing is
+      // left to say, and stopping the service took its notification with it.
+      if (loggingIn) post(context) else NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
       return
     }
 

@@ -2,7 +2,7 @@
     <string name="app_name">"Star Music"</string>
     <string name="main_activity_title">"Star Music"</string>
     <string name="keepalive_channel">"Playback"</string>
-    <string name="keepalive_text">"Running in the background"</string>
+    <string name="keepalive_text">"Waiting for you to sign in"</string>
     <string name="media_previous">"Previous"</string>
     <string name="media_play">"Play"</string>
     <string name="media_pause">"Pause"</string>

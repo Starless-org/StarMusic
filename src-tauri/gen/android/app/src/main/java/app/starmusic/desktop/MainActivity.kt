@@ -22,9 +22,8 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
-    // From the activity, while it is in front: Android only lets a visible app
-    // start a foreground service. See `KeepAliveService`.
-    ContextCompat.startForegroundService(this, Intent(this, KeepAliveService::class.java))
+    // The foreground service is not started here: it starts with the music or
+    // the login, and goes with them. See `NowPlayingCenter.keepAlive`.
     askForNotifications()
   }
 
@@ -53,17 +52,26 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(Bridge(), "StarMusicAndroid")
   }
 
-  /**
-   * What the page asks of the activity. Only one thing: going behind the other
-   * apps when the back button has nothing left to close (`src/lib/back.ts`).
-   * Finishing the activity instead would run `onDestroy`, which stops the
-   * service that keeps the music alive — "back" on Home would stop the song.
-   */
+  /** What the page asks of the activity. */
   inner class Bridge {
+    /**
+     * Going behind the other apps when the back button has nothing left to
+     * close (`src/lib/back.ts`). Finishing the activity instead would run
+     * `onDestroy`, which stops the service that keeps the music alive — "back"
+     * on Home would stop the song.
+     */
     @JavascriptInterface
     fun moveToBack() {
       runOnUiThread { moveTaskToBack(true) }
     }
+
+    /**
+     * The login opened the browser (`true`) or got its answer back (`false`).
+     * While the browser is in front, the callback to `127.0.0.1:8989` needs the
+     * network that Android takes from a background app. See `AuthGate.tsx`.
+     */
+    @JavascriptInterface
+    fun holdForLogin(on: Boolean) = NowPlayingCenter.login(this@MainActivity, on)
   }
 
   override fun onDestroy() {

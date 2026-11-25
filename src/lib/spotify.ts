@@ -541,7 +541,25 @@ export async function jamAddToQueue(sessionId: string, trackId: string): Promise
  * in between.
  */
 export function onPlaybackStatus(handler: (status: PlaybackStatus) => void): Promise<UnlistenFn> {
-  return listen<PlaybackStatus>("player://status", (event) => handler(event.payload));
+  return listen<PlaybackStatus>("player://status", (event) => {
+    lastStatus = event.payload;
+    handler(event.payload);
+  });
+}
+
+let lastStatus: PlaybackStatus | null = null;
+
+/**
+ * The last status the player sent, as it arrived — not as the last render saw it.
+ *
+ * **A render can be minutes old.** On the phone, with the app in the
+ * background, Android freezes the page's renders and still delivers the
+ * player's events and the lock screen's keys. A "play" pressed after a pause
+ * read `playing` from the render before the pause, took it for a no-op, and
+ * the music did not come back. What the keys decide on comes from here.
+ */
+export function lastPlaybackStatus(): PlaybackStatus | null {
+  return lastStatus;
 }
 
 /**

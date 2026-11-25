@@ -399,7 +399,7 @@ La `MediaSession` resultó **no** ser otro `imp` de `media_keys.rs`: vive en
 Kotlin (`NowPlayingCenter.kt`), y la página le habla directo por un puente
 (`window.StarMusicMedia`), con el mismo `NowPlaying` que recibe Windows. Las
 teclas vuelven a la página como `__starMusicMediaKey(...)` y entran al mismo
-manejador que `media://key`. Tres cosas medidas en un Galaxy S22:
+manejador que `media://key`. Cuatro cosas medidas en un Galaxy S22:
 
 - **Con la pantalla apagada, la canción siguiente quedaba cargando.** El
   procesador se suspende cuando nada lo mantiene despierto, y la salida de
@@ -413,6 +413,21 @@ manejador que `media://key`. Tres cosas medidas en un Galaxy S22:
   `MainActivity.dispatchKeyEvent` las manda a `NowPlayingCenter` primero.
 - **El ícono chico de la notificación es la marca sin placa**
   (`ic_launcher_foreground`): la barra de estado dibuja solo la silueta.
+- **Con la app atrás, la página se congela y React deja de renderizar.**
+  Uno o dos minutos después de que la app queda en segundo plano, todo lo que
+  la página programa para sí misma se detiene: `setTimeout`, `MessageChannel`
+  —con el que React programa sus renders y sus efectos—,
+  `requestAnimationFrame` y `fetch`. Lo que sigue corriendo es lo que entra
+  desde afuera: los eventos de Rust, las teclas que inyecta Kotlin y las
+  llamadas a Rust. El avance de cola era un efecto sobre `status`, así que la
+  canción terminaba y la siguiente no llegaba hasta desbloquear; y el "play"
+  de la pantalla de bloqueo leía el `playing` de un render de antes de la
+  pausa y no hacía nada. **Lo que tiene que pasar en segundo plano se decide
+  en el listener**, con el último estado del player (`lastPlaybackStatus`) y
+  las refs, nunca con el último render. Medido el 25/11: con la página
+  congelada desde 11:38:03, la canción terminó a las 11:39:26 y la siguiente
+  arrancó 35 ms después. Para verlo, la consola de la WebView de una build de
+  debug: `adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>`.
 
 ## El frontend
 

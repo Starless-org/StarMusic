@@ -1,5 +1,13 @@
 import { useEffect, useRef } from "react";
-import { coverImage, mediaSession, onMediaKey, type Track, trackArtists } from "./spotify";
+import {
+  coverImage,
+  lastPlaybackStatus,
+  mediaSession,
+  type NowPlaying,
+  onMediaKey,
+  type Track,
+  trackArtists,
+} from "./spotify";
 
 /**
  * What the keys can ask the player for.
@@ -11,8 +19,11 @@ import { coverImage, mediaSession, onMediaKey, type Track, trackArtists } from "
  */
 export type PlayerActions = {
   toggle: (() => void) | null;
-  /** For a media key that says which way: "play" while playing does nothing. */
-  playing: boolean;
+  /**
+   * The DJ is talking, which counts as playing for a media key that says which
+   * way. Whether the music plays is not asked here: see `lastPlaybackStatus`.
+   */
+  talking: boolean;
   next: (() => void) | null;
   previous: (() => void) | null;
   /** Relative, in milliseconds. */
@@ -133,12 +144,60 @@ export function usePlayerKeys(actions: PlayerActions) {
       else if (key === "previous") a.previous?.();
       // Windows sends "play" or "pause" from the card, and a headset may send
       // either: the one that matches what is already happening is a no-op.
-      else if ((key === "play") !== a.playing) a.toggle?.();
+      // Asked of the player's last word, not of the last render: on the phone
+      // the render can be from before the pause (`lastPlaybackStatus`).
+      else if ((key === "play") !== (a.talking || (lastPlaybackStatus()?.playing ?? false))) {
+        a.toggle?.();
+      }
     });
     return () => {
       void unlisten?.then((stop) => stop());
     };
   }, []);
+}
+
+/** What the media card says, from what the bar shows. */
+function describe(
+  track: Track | null,
+  dj: { speaker: string | null } | null | undefined,
+  playing: boolean,
+  djLabel: string,
+) {
+  return {
+    title: dj ? (dj.speaker ?? djLabel) : (track?.name ?? null),
+    artist: dj ? "" : track ? trackArtists(track) : "",
+    album: dj ? "" : (track?.album?.name ?? ""),
+    artwork: dj ? null : (coverImage(track?.album?.images)?.url ?? null),
+    on: dj ? true : playing,
+    seekable: !dj,
+  };
+}
+
+/**
+ * The same card for a song, built outside a render: the phone's lock screen
+ * while the page is frozen in the background (see `onStatusRef` in `App.tsx`).
+ * It has to say exactly what `useMediaSession` would, or the card would change
+ * its mind the moment the page wakes up.
+ */
+export function nowPlayingOf(
+  track: Track,
+  playing: boolean,
+  loading: boolean,
+  positionMs: number,
+  durationMs: number,
+): NowPlaying {
+  const { title, artist, album, artwork, on, seekable } = describe(track, null, playing, "");
+  return {
+    title: title ?? "",
+    artist,
+    album,
+    artwork,
+    playing: on,
+    loading,
+    seekable,
+    positionMs,
+    durationMs,
+  };
 }
 
 /**
@@ -162,12 +221,7 @@ export function useMediaSession(
   positionMs = 0,
   durationMs = 0,
 ) {
-  const title = dj ? (dj.speaker ?? djLabel) : (track?.name ?? null);
-  const artist = dj ? "" : track ? trackArtists(track) : "";
-  const album = dj ? "" : (track?.album?.name ?? "");
-  const artwork = dj ? null : (coverImage(track?.album?.images)?.url ?? null);
-  const on = dj ? true : playing;
-  const seekable = !dj;
+  const { title, artist, album, artwork, on, seekable } = describe(track, dj, playing, djLabel);
   const at = useRef({ positionMs, durationMs });
   at.current = { positionMs, durationMs };
 

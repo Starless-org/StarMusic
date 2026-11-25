@@ -913,7 +913,7 @@ function PhoneSettings({
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: peek ? 0 : 1, y: 0 }}
       transition={{ ...SPRING_SHEET, opacity: { duration: 0.16 } }}
-      className="glass-sheet fixed inset-x-3 top-[max(12px,env(safe-area-inset-top))] bottom-[max(12px,env(safe-area-inset-bottom))] z-40 overflow-hidden rounded-card"
+      className="glass-sheet fixed inset-x-3 top-[calc(env(safe-area-inset-top)+12px)] bottom-[max(12px,env(safe-area-inset-bottom))] z-40 overflow-hidden rounded-card"
       role="dialog"
       aria-modal="true"
       aria-label={t.settingsTitle}

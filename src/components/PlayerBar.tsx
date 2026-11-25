@@ -276,6 +276,23 @@ export function PlayerBar({
     }, SEEK_SETTLE_MS);
   }, []);
 
+  /**
+   * Un salto que ya es uno solo: la barra de la pantalla de bloqueo del
+   * teléfono, que avisa al soltar y no mientras se arrastra.
+   *
+   * **No pasa por el temporizador de `requestSeek`.** Con la pantalla apagada
+   * la página está oculta, y Chromium frena los temporizadores de una página
+   * oculta hasta correrlos una vez por minuto: el salto se quedaba esperando
+   * y la canción seguía donde estaba. Sin temporizador, sale en el momento.
+   */
+  const seekNow = useCallback((next: number) => {
+    if (seekTimer.current !== null) window.clearTimeout(seekTimer.current);
+    seekTimer.current = null;
+    setSeekTo(next);
+    seekSentAt.current = performance.now();
+    void seekPlayback(next).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (seekTo === null) return;
     // El backend llegó a la posición pedida: el control vuelve a seguir al
@@ -403,8 +420,7 @@ export function PlayerBar({
       noSong || duration <= 0
         ? null
         : (delta) => requestSeek(Math.max(0, Math.min(duration, shownPosition + delta))),
-    seekTo:
-      noSong || duration <= 0 ? null : (at) => requestSeek(Math.max(0, Math.min(duration, at))),
+    seekTo: noSong || duration <= 0 ? null : (at) => seekNow(Math.max(0, Math.min(duration, at))),
     volumeBy: (delta) => {
       const next = Math.round(
         Math.max(0, Math.min(MAX_VOLUME, askedVolume.current + delta * MAX_VOLUME)),

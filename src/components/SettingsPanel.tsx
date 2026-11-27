@@ -123,6 +123,7 @@ import {
 } from "../lib/version";
 import { ConsentDialog, consentTitle } from "./ConsentDialog";
 import { DevPanel } from "./DevPanel";
+import { EqualizerPanel } from "./EqualizerPanel";
 import { Select } from "./Select";
 import { SmoothSlider } from "./SmoothSlider";
 
@@ -1197,6 +1198,7 @@ function Audio({
   t: Record<StringKey, string>;
   soloist?: SoloistSettings | null;
 }) {
+  const search = useSearch();
   const [crossfade, setCrossfade] = useState<number | null>(null);
 
   useEffect(() => {
@@ -1300,6 +1302,16 @@ function Audio({
           </span>
         </Row>
       </Group>
+
+      {matchesSearch(
+        search,
+        t.equalizer,
+        `${t.eqHint} ${t.eqBass} ${t.eqTreble} ${t.eqVocal} ${t.eqRock} ${t.eqAcoustic}`,
+      ) && (
+        <div className="setting-row">
+          <EqualizerPanel t={t} soloist={soloist !== null} />
+        </div>
+      )}
 
       {/*
         The history Home reads (`history.rs`). On this machine only, and the

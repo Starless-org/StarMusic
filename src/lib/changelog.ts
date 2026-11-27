@@ -40,6 +40,25 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "Unreleased",
+    date: null,
+    released: false,
+    sections: {
+      es: [
+        {
+          title: "Corregido",
+          items: ["El control de volumen queda centrado bajo el cursor al arrastrarlo."],
+        },
+      ],
+      en: [
+        {
+          title: "Fixed",
+          items: ["The volume thumb stays centred under the pointer while dragging."],
+        },
+      ],
+    },
+  },
+  {
     version: "0.7.0",
     date: "2026-11-10",
     released: true,

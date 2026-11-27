@@ -59,7 +59,6 @@ export const CHANGELOG: ChangelogEntry[] = [
         {
           title: "Corregido",
           items: [
-            "El control de volumen queda centrado bajo el cursor al arrastrarlo.",
             "La app ofrecía la 0.5.5 cuando ya había salido la 0.6.0. Comprobaba una sola vez al arrancar, y como Star Music vive en la bandeja esa respuesta quedaba en pantalla durante días: quien venía de la prerelease tenía que instalar la 0.5.5 para recién ver la 0.6.0. Ahora vuelve a preguntar al abrir Ajustes y, sola, cada seis horas.",
             "Apagar el modo aleatorio devuelve el orden de la playlist. Antes el orden mezclado se quedaba, así que el interruptor no tenía un apagado de verdad. Ahora la canción que suena sigue sonando en su lugar, y lo que agregaste a la cola mientras estaba mezclado queda justo después.",
             "Abrir otra playlist ya no vacía la cola. La cola cambia sólo cuando pones algo a sonar, así que mirar otra lista ya no deja a la canción que suena sin nada detrás.",
@@ -68,6 +67,7 @@ export const CHANGELOG: ChangelogEntry[] = [
             "El borde inferior del contenido vuelve a difuminarse. Se veía un corte seco bajo la lista; ahora el fundido se mantiene dentro de la columna y tiene un piso opaco, con una prueba que lo vigila.",
             "Abrir y cerrar paneles y menús usa un solo reloj. Todos comparten las mismas duraciones y curvas, así que ya no se sienten a ritmos distintos.",
             "El número de pista se esconde detrás del indicador de reproducción.",
+            "El control de volumen queda centrado bajo el cursor al arrastrarlo.",
           ],
         },
       ],
@@ -86,7 +86,6 @@ export const CHANGELOG: ChangelogEntry[] = [
         {
           title: "Fixed",
           items: [
-            "The volume thumb stays centred under the pointer while dragging.",
             "The app offered 0.5.5 after 0.6.0 was out. It checked once at launch, and since Star Music lives in the tray that answer stayed on screen for days: someone coming from the prerelease had to install 0.5.5 before being offered 0.6.0. It now asks again when Settings opens and, on its own, every six hours.",
             "Turning shuffle off brings the playlist's order back. The shuffled order used to stay, so the switch had no real off. The song that is playing keeps playing at its place, and what you queued while shuffled stays right after it.",
             "Opening another playlist no longer empties the queue. The queue changes only when you play something, so looking at another list no longer leaves the playing song with nothing behind it.",
@@ -95,6 +94,7 @@ export const CHANGELOG: ChangelogEntry[] = [
             "The content's bottom edge fades again. A hard cut showed under the list; the fade now stays inside the column and has an opaque floor, with a test guarding it.",
             "Opening and closing panels and menus use one clock. They all share the same durations and curves, so they no longer feel out of step.",
             "The track number hides behind the playing indicator.",
+            "The volume thumb stays centred under the pointer while dragging.",
           ],
         },
       ],

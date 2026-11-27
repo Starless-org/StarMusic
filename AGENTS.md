@@ -67,6 +67,7 @@ src-tauri/src/
   lib.rs                  comandos Tauri, el registro, el ciclo de vida
   auth.rs                 OAuth y la sesión de librespot
   spclient.rs             la biblioteca, leída por la sesión (ver Regla 7)
+  spclient/plays.rs       los eventos que hacen que una canción cuente en la cuenta
   models.rs               las formas que el frontend ve
   playback.rs             el player de librespot y el volumen
   voice.rs                la voz del DJ: el sink propio y el audio de la narración
@@ -89,6 +90,7 @@ docs/jam.md               el protocolo de la sesión compartida, y cómo se supo
 docs/android.md           llevar la app a Android: lo que hay que medir antes
 docs/landing-hosting.md   dónde vive la landing (en Starless-org/Starless) y el redirect que quedó acá
 docs/soloist.md           la salida de emergencia para las cuentas sin claves: el plan con Soloist
+docs/reportar-reproducciones.md que lo escuchado cuente en la cuenta: la receta y lo que falta medir
 ```
 
 **Antes de tocar la creación de playlists, lee `docs/escribir-playlists.md`.** Es
@@ -437,6 +439,10 @@ en ningún proto ni en ninguna issue:
     nada si Soloist no corre.
   - **En el frontend**, tres códigos en `SESSION_ERRORS` que una cuenta sana no
     recibe nunca.
+  - **`record_play` no reporta la canción a la cuenta con Soloist activo**
+    (`soloist_state.active()`): Soloist es el cliente oficial y reporta sus
+    canciones solo, así que reportarlas también acá las contaría dos veces. El
+    historial local se escribe igual.
   **Un punto de contacto nuevo se agrega a esta lista con su motivo**, o no va.
   Y antes de un PR que toque cualquiera de ellos, la prueba con una cuenta que
   suena, en [`reference/verificar.md`](.agent/skills/star-music/reference/verificar.md).

@@ -1940,9 +1940,52 @@ fn set_surface_opacity(opacity: u8) {
 // --- Listening history (on this machine only) ------------------------------
 
 /// One song, heard. `history` drops it when it was a skip or history is off.
+///
+/// **The same measurement goes to the account, with the person's permission**
+/// (PRODUCT.md, "Plays on your account"): one answer to "how long was this
+/// heard", not a second clock that could disagree with Home. The two are
+/// independent: history off still reports, and reporting off still keeps
+/// history. Only plays of 30 seconds or more arrive here, which is Spotify's
+/// own threshold for its history.
 #[tauri::command]
-fn record_play(play: history::Play) {
+fn record_play(
+    play: history::Play,
+    session_state: State<SessionState>,
+    soloist_state: State<soloist::SoloistState>,
+) {
     history::record(&play);
+
+    // Soloist plays through Spotify's own client, which reports its plays
+    // itself: reporting them here too would count every song twice.
+    if soloist_state.active() || !consent::granted(consent::Integration::SpotifyPlays) {
+        return;
+    }
+    let Some(session) = session_state.0.lock().ok().and_then(|guard| guard.clone()) else {
+        return;
+    };
+    let context_uri = match play.context.as_ref() {
+        Some(context) if context.id == "liked" => {
+            format!("spotify:user:{}:collection", session.username())
+        }
+        Some(context) => format!("spotify:{}:{}", context.kind, context.id),
+        None => String::new(),
+    };
+    let heard = spclient::plays::Heard {
+        uri: format!("spotify:track:{}", play.track_id),
+        context_uri,
+        ms_played: i64::from(play.listened_ms),
+        // The end, minus what was heard: pauses in between move the start a
+        // little later than it was, and that is the side to err on.
+        started_ms: play.at - i64::from(play.listened_ms),
+        ended_ms: play.at,
+        duration_ms: i64::from(play.duration_ms),
+    };
+    // Off the main thread: two requests and a metadata lookup.
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Err(code) = spclient::report_play(&session, heard) {
+            log::warn!("escuchas: la canción no se pudo reportar: {code}");
+        }
+    });
 }
 
 /// Home's history sections. `tz_offset_min` is the webview's `getTimezoneOffset()`,

@@ -2696,11 +2696,148 @@ fn rootlist_revision(session: &Session) -> Result<Vec<u8>, String> {
         })
 }
 
+/// Lo que es de esta ejecución de la app en los eventos de escucha: la
+/// secuencia, su número y el reloj monotónico desde que arrancó.
+struct PlaysRun {
+    run: plays::Run,
+    sequence: std::sync::atomic::AtomicI64,
+    started: std::time::Instant,
+}
+
+static PLAYS_RUN: std::sync::LazyLock<PlaysRun> = std::sync::LazyLock::new(|| PlaysRun {
+    run: plays::Run { sequence_id: rand::random(), app_session: rand::random() },
+    sequence: std::sync::atomic::AtomicI64::new(0),
+    started: std::time::Instant::now(),
+});
+
+/// El archivo que el player eligió para esta canción, con el mismo orden de
+/// formatos que la calidad guardada en Ajustes. Si no se puede saber, se manda
+/// sin él: el campo es opcional y el que decide es el `audio_id`.
+fn played_audio(owned: &Session, uri: &SpotifyUri) -> impl Future<Output = plays::Audio> + Send + 'static {
+    use librespot_metadata::audio::AudioFileFormat as F;
+    let owned = owned.clone();
+    let uri = uri.clone();
+    async move {
+        let order: &[(F, &str)] = match crate::settings::saved_audio_quality() {
+            "low" => &[(F::OGG_VORBIS_96, "Vorbis 96 kbps"), (F::OGG_VORBIS_160, "Vorbis 160 kbps")],
+            "normal" => &[(F::OGG_VORBIS_160, "Vorbis 160 kbps"), (F::OGG_VORBIS_96, "Vorbis 96 kbps")],
+            _ => &[
+                (F::OGG_VORBIS_320, "Vorbis 320 kbps"),
+                (F::OGG_VORBIS_160, "Vorbis 160 kbps"),
+                (F::OGG_VORBIS_96, "Vorbis 96 kbps"),
+            ],
+        };
+        let mut audio = plays::Audio::default();
+        if let Ok(track) = MetaTrack::get(&owned, &uri).await
+            && let Some((file, format)) =
+                order.iter().find_map(|(format, label)| track.files.0.get(format).map(|file| (file, *label)))
+        {
+            audio.file_id = file.0.to_vec();
+            audio.format = format.to_string();
+        }
+        match owned.spclient().get_metadata(ExtensionKind::AUDIO_FILES, &uri).await {
+            Ok(data) => audio.audio_id = plays::audio_id(&data),
+            Err(e) => log::warn!("escuchas: no vino el audio_id: {e}"),
+        }
+        audio
+    }
+}
+
+/// Que una canción escuchada acá cuente en la cuenta (`spclient/plays.rs`).
+///
+/// **El permiso se pregunta acá, antes de cada pedido** (AGENTS.md): el
+/// comando que llama a esto ya lo preguntó, pero entre esa pregunta y el
+/// pedido pasan una búsqueda de metadata y un token, y un "no" que llega en el
+/// medio tiene que ganar.
+///
+/// **Un intento y nada más.** Si falla, queda una línea en el log y la
+/// canción no cuenta: es lo que dice el ROADMAP, y una cola que reintenta es
+/// una cola que puede mandar después de que la persona dijo que no.
+///
+/// **Un `200` no es un "entró".** El servicio de eventos devuelve los rechazos
+/// adentro de la respuesta, y se leen.
+pub fn report_play(session: &Session, heard: plays::Heard) -> Result<(), String> {
+    use crate::consent::{self, Integration};
+    let uri = SpotifyUri::from_uri(&heard.uri).map_err(|_| "bad_track_id".to_string())?;
+    let owned = session.clone();
+
+    call(session, async move {
+        let audio = played_audio(&owned, &uri).await;
+        let token = owned.login5().auth_token().await.map_err(|e| {
+            log::error!("escuchas: el token de la cuenta no salió: {e}");
+            "connection_lost".to_string()
+        })?;
+        let client_token = owned.spclient().client_token().await.ok();
+        let client_id = owned.client_id();
+        let client = plays::Client { client_id: &client_id, device_id: owned.device_id() };
+        let state = &*PLAYS_RUN;
+        let sequence = state.sequence.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let clock = state.started.elapsed().as_millis() as i64;
+        let events = plays::publish_request(&client, &state.run, sequence, &heard, &audio, clock);
+
+        // El host va escrito, como el de la voz del DJ: el access point
+        // regional contesta con una redirección.
+        let post = |path: &'static str, body: Vec<u8>| {
+            let mut request = reqwest::Client::new()
+                .post(format!("https://spclient.wg.spotify.com{path}"))
+                // Los mismos encabezados que ya se midieron: el `User-Agent` de
+                // la voz del DJ y los dos de librespot#1759.
+                .header("User-Agent", "Spotify/124200290 Windows/0 (librespot)")
+                .header("Content-Type", "application/x-protobuf")
+                .header("app-platform", "Win32")
+                .header("spotify-app-version", plays::REPORTING_VERSION_CODE.to_string())
+                .bearer_auth(&token.access_token)
+                .timeout(Duration::from_secs(20))
+                .body(body);
+            if let Some(client_token) = &client_token {
+                request = request.header("client-token", client_token);
+            }
+            async move {
+                let response = request.send().await.map_err(|e| {
+                    log::warn!("escuchas: {path} no se pudo mandar: {}", e.without_url());
+                    "network_failed".to_string()
+                })?;
+                let status = response.status();
+                let body = response.bytes().await.unwrap_or_default();
+                if !status.is_success() {
+                    log::warn!("escuchas: {path} contestó {status}");
+                    return Err("bad_response".to_string());
+                }
+                Ok(body.to_vec())
+            }
+        };
+
+        if !consent::granted(Integration::SpotifyPlays) {
+            return Ok(());
+        }
+        let reply = post(plays::EVENTS_PATH, events).await?;
+        let rejected = plays::rejections(&reply);
+        if !rejected.is_empty() {
+            log::warn!("escuchas: el servicio rechazó el evento (índice, transitorio, motivo): {rejected:?}");
+            return Err("bad_response".to_string());
+        }
+
+        if !consent::granted(Integration::SpotifyPlays) {
+            return Ok(());
+        }
+        post(plays::HISTORY_PATH, plays::history_request(&heard)).await?;
+        log::info!(
+            "escuchas: reportada una canción de {} s (audio_id: {})",
+            heard.ms_played / 1000,
+            if audio.audio_id.is_empty() { "no" } else { "sí" }
+        );
+        Ok(())
+    })
+}
+
 #[cfg(debug_assertions)]
 mod probe;
 
 /// La cola compartida del jam: el servicio de listas y su protobuf.
 mod jamlist;
+
+/// Los eventos que hacen que una canción escuchada cuente en la cuenta.
+pub mod plays;
 
 #[cfg(debug_assertions)]
 pub use probe::{

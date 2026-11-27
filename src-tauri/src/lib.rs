@@ -13,6 +13,7 @@
 mod auth;
 mod background;
 mod beat;
+mod consent;
 mod crossfade;
 mod history;
 mod keycheck;
@@ -952,6 +953,10 @@ fn sign_out(
             session.shutdown();
         }
     }
+    // What this account allowed to leave does not carry over to the next one.
+    // Before the credentials, not after: `forget_credentials` can fail and
+    // return early, and a grant must not outlive the sign-out because of it.
+    consent::revoke_account_scoped();
     auth::forget_credentials()?;
     keycheck::clear(&app);
     // The key and the Connect pairing were the account's.
@@ -1962,6 +1967,34 @@ fn clear_history() {
     history::clear();
 }
 
+// --- Consented integrations (PRODUCT.md) -----------------------------------
+
+/// Which integrations this build has, and which ones the person turned on.
+/// Booleans only: the grant itself never reaches the webview.
+#[tauri::command]
+fn consent_status() -> Vec<consent::Status> {
+    consent::status()
+}
+
+/// The person pressed "Allow" in the permission dialog.
+#[tauri::command]
+fn consent_grant(integration: String) -> Result<Vec<consent::Status>, String> {
+    let integration =
+        consent::Integration::from_id(&integration).ok_or("unknown_integration")?;
+    consent::grant(integration)?;
+    Ok(consent::status())
+}
+
+/// The person switched an integration off. Each integration that keeps
+/// something pending drops it here as well (see `consent::revoke`).
+#[tauri::command]
+fn consent_revoke(integration: String) -> Result<Vec<consent::Status>, String> {
+    let integration =
+        consent::Integration::from_id(&integration).ok_or("unknown_integration")?;
+    consent::revoke(integration);
+    Ok(consent::status())
+}
+
 /// How many seconds two songs overlap when one ends on its own; 0 is off.
 #[tauri::command]
 fn crossfade_seconds() -> u8 {
@@ -2401,6 +2434,9 @@ pub fn run() {
             history_enabled,
             set_history_enabled,
             clear_history,
+            consent_status,
+            consent_grant,
+            consent_revoke,
             accent,
             set_accent,
             library_sort,

@@ -106,6 +106,36 @@ export const strings = {
     historySettingHint: "Guarda lo que escuchas para el Inicio. Nunca sale de tu equipo.",
     clearHistory: "Borrar historial",
     historyCleared: "Historial borrado",
+    connectionsTitle: "Conexiones",
+    connectionsHint:
+      "Lo que compartes con servicios que ya usas. Todo viene apagado y nada va a Star Music.",
+    consentSpotifyPlays: "Que tus minutos cuenten en tu cuenta",
+    consentSpotifyPlaysHint:
+      "Lo que escuchas aquí aparece en tu historial y tus estadísticas de Spotify.",
+    consentSpotifyPlaysWhat:
+      "Cada canción que escuchas: cuál es, desde dónde la pusiste (una playlist, el DJ, la radio) y cuántos segundos sonó de verdad.",
+    consentSpotifyPlaysTo: "Tu cuenta de Spotify, por la misma sesión con la que ya escuchas.",
+    consentSpotifyPlaysWhen: "Cuando cada canción termina o la saltas.",
+    consentDiscordPresence: "Mostrar lo que suena en Discord",
+    consentDiscordPresenceHint: "Tu estado de Discord dice qué estás escuchando.",
+    consentDiscordPresenceWhat:
+      "El título, el artista, el álbum, la portada y por dónde va la canción.",
+    consentDiscordPresenceTo:
+      "La app de Discord de esta computadora y, desde ahí, quien pueda ver tu estado.",
+    consentDiscordPresenceWhen: "Mientras suena algo, y cada vez que cambia la canción.",
+    consentConnectDevice: "Usar Star Music desde tus otros dispositivos",
+    consentConnectDeviceHint: "Tu teléfono y tus parlantes ven Star Music y pueden controlarla.",
+    consentConnectDeviceWhat:
+      "Que Star Music es un dispositivo de tu cuenta, y lo que está sonando.",
+    consentConnectDeviceTo: "Tus otros dispositivos con la misma cuenta, a través de Spotify.",
+    consentConnectDeviceWhen: "Mientras Star Music está abierta.",
+    consentWhat: "Qué sale",
+    consentTo: "A quién",
+    consentWhen: "Cuándo",
+    consentPromise:
+      "Nada de esto va a Star Music ni a quien la hace. Puedes apagarlo cuando quieras y deja de enviarse en el acto.",
+    consentAllow: "Permitir",
+    consentNotNow: "Ahora no",
     // El DJ de la cuenta. Su card no muestra cuántas canciones tiene —no se
     // sabe hasta que se pide el mix— sino lo que es: alguien que elige.
     djSubtitle: "Elige la música por ti",
@@ -672,6 +702,34 @@ export const strings = {
     historySettingHint: "Keeps what you listen to for Home. It never leaves your computer.",
     clearHistory: "Clear history",
     historyCleared: "History cleared",
+    connectionsTitle: "Connections",
+    connectionsHint:
+      "What you share with services you already use. Everything starts off, and nothing goes to Star Music.",
+    consentSpotifyPlays: "Count your listening on your account",
+    consentSpotifyPlaysHint: "What you play here shows up in your Spotify history and stats.",
+    consentSpotifyPlaysWhat:
+      "Each song you listen to: which one, where you played it from (a playlist, the DJ, the radio) and how many seconds you actually heard.",
+    consentSpotifyPlaysTo:
+      "Your Spotify account, through the same session you already listen with.",
+    consentSpotifyPlaysWhen: "When each song ends or you skip it.",
+    consentDiscordPresence: "Show what's playing on Discord",
+    consentDiscordPresenceHint: "Your Discord status says what you're listening to.",
+    consentDiscordPresenceWhat: "The song's title, artist, album, cover and how far in it is.",
+    consentDiscordPresenceTo:
+      "The Discord app on this computer and, from there, anyone who can see your status.",
+    consentDiscordPresenceWhen: "While something plays, and every time the song changes.",
+    consentConnectDevice: "Control Star Music from your other devices",
+    consentConnectDeviceHint: "Your phone and speakers see Star Music and can control it.",
+    consentConnectDeviceWhat: "That Star Music is a device on your account, and what it's playing.",
+    consentConnectDeviceTo: "Your other devices on the same account, through Spotify.",
+    consentConnectDeviceWhen: "While Star Music is open.",
+    consentWhat: "What leaves",
+    consentTo: "Who gets it",
+    consentWhen: "When",
+    consentPromise:
+      "None of it goes to Star Music or the people who make it. Turn it off whenever you like, and it stops right away.",
+    consentAllow: "Allow",
+    consentNotNow: "Not now",
     // The account's DJ. Its card does not say how many songs it has —that is
     // only known once the mix is asked for— but what it is: someone who picks.
     djSubtitle: "Picks the music for you",
@@ -1246,6 +1304,11 @@ const errorsEs = {
   soloist_no_key: "Falta tu clave de Soloist.",
   soloist_no_dir: "No hay dónde guardar Soloist en esta computadora.",
   soloist_unsupported: "Soloist todavía no está disponible en este sistema.",
+  // Neither reaches a person through the Settings rows, which only offer what
+  // the build has: they are a stale window or a forged call, and saying so beats
+  // an unexplained switch that springs back.
+  unknown_integration: "Esa conexión no existe en esta versión.",
+  integration_unavailable: "Esa conexión todavía no está disponible.",
 };
 
 /**
@@ -1307,5 +1370,7 @@ export const errors: Record<Lang, Record<keyof typeof errorsEs, string>> = {
     soloist_no_key: "Your Soloist key is missing.",
     soloist_no_dir: "There's nowhere to keep Soloist on this computer.",
     soloist_unsupported: "Soloist isn't available on this system yet.",
+    unknown_integration: "That connection doesn't exist in this version.",
+    integration_unavailable: "That connection isn't available yet.",
   },
 };

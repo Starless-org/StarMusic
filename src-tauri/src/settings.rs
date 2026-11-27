@@ -130,6 +130,14 @@ pub struct Settings {
     /// How soft the background picture is drawn, 0..=100 of the frontend's range.
     #[serde(default)]
     pub background_blur: Option<u8>,
+
+    /// What the person allowed to leave the machine, by integration id
+    /// (`consent.rs`). Empty means nothing, which is the default for everyone.
+    ///
+    /// **Not part of the customisation reset**: a "back to default look" button
+    /// that quietly changed what is shared would be the opposite of a consent.
+    #[serde(default)]
+    pub consents: BTreeMap<String, crate::consent::Grant>,
 }
 
 /// Back to what ships: everything under Settings → Customisation, and nothing else.
@@ -545,6 +553,12 @@ pub fn save_history_enabled(enabled: bool) {
 /// Whether the history is kept: on until the person says otherwise.
 pub fn saved_history_enabled() -> bool {
     load().history_enabled.unwrap_or(true)
+}
+
+/// Change the grants. Only `consent.rs` calls this: it is the one place that
+/// decides what a grant is.
+pub fn update_consents(change: impl FnOnce(&mut BTreeMap<String, crate::consent::Grant>)) {
+    update(|settings| change(&mut settings.consents));
 }
 
 /// Remember the streaming quality. Refuses anything outside [`AUDIO_QUALITIES`],

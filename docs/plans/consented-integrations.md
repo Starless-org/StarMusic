@@ -253,6 +253,11 @@ Commit: `feat(discord): show what is playing in Discord when the person allows i
   Discord sin enviar cada tick del reproductor. Hasta cinco cambios en una
   ventana de veinte segundos salen sin una espera fija; si se agota ese cupo,
   queda pendiente el estado más reciente.
+- Las transiciones de carga no se publican en Discord. El backend descarta
+  actividades equivalentes, tolerando un segundo de variación del reloj, y
+  agrupa los cambios de posición durante 250 ms. Pausar no espera esa agrupación.
+  Los cinco envíos por veinte segundos son el presupuesto conservador de la
+  app; falta medir por separado el límite que aplica el cliente de Discord.
 - El DJ hablando muestra su nombre, sin artista, sin portada y sin barra.
 - Sólo Windows por ahora; Linux y macOS usan un socket Unix.
 - Falta: crear la aplicación en el portal de Discord y cargar su ID como la

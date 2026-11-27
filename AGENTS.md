@@ -78,6 +78,7 @@ src-tauri/src/
   soloist.rs              Spotify Soloist para esas cuentas: descarga, clave, proceso y WebSocket
   settings.rs             lo que sobrevive a un reinicio
   logging.rs              el log local con rotación
+  consent.rs              los permisos de cada integración (todavía no existe: plan en docs/plans/)
 relay/                    el Worker que recibe los reportes y crea los issues
 landing-redirect/         el Worker que lleva la dirección vieja de la landing al sitio de Starless
 .agent/                   configuración de agentes (Claude Code y OpenCode)
@@ -134,10 +135,19 @@ en ningún proto ni en ninguna issue:
 1. **El audio no pasa por la webview.** El PCM va de librespot al driver del
    sistema. Moverlo a una API del webview rompe las dos promesas que justifican
    la app: arranque y memoria.
-2. **Cero telemetría.** Sólo sale algo de la máquina con un clic, y sólo tras un
-   crash o un feedback. El log es opt-in; nunca por defecto.
-3. **Nada de telemetría, ni de nombre de Spotify.** En ninguna parte: código,
-   docs, íconos, issues.
+2. **Nada sale sin permiso, y nada va al autor.** Analítica para Star Music o su
+   autor: nunca, en ninguna forma. Lo que sale hacia un servicio que eligió la
+   persona —su cuenta de Spotify, Discord— es una **integración con permiso**:
+   apagada por defecto, con un diálogo que dice qué sale, a quién y cuándo,
+   **comprobada en Rust donde sale el byte** (`consent.rs`) y revocable en el
+   acto. Si la persona no acepta, esa integración no existe; el resto de la app
+   funciona igual. La lista de integraciones es cerrada y vive en `PRODUCT.md`
+   ("Consented integrations"): una que no está ahí no se publica. El reporte de
+   crash y el feedback siguen saliendo sólo con un clic, y el log sigue siendo
+   opt-in.
+3. **Nada del nombre ni de la marca de Spotify.** En ninguna parte de la marca:
+   íconos, textos de la app, el estado de Discord, issues. Nombrar el servicio
+   para decir a dónde va un dato (en el diálogo de permiso) no es marca.
 4. **Premium o nada.** Es una restricción de librespot, no una decisión.
 5. **Todo texto pasa por `lib/i18n.ts`**, en los dos idiomas a la vez, escritos
    para que ambos lean natural y no como traducción.
@@ -1151,6 +1161,15 @@ en ningún proto ni en ninguna issue:
   ganaba y la lista se veía llenarse de a poco. **Si animas algo, que sea un
   transform; si agregas una lista que puede ser larga, pásala por
   `useRowWindow`.**
+- **Un permiso se comprueba donde sale el byte, no donde se dibuja el
+  interruptor.** El interruptor de Ajustes es la idea que el webview tiene del
+  permiso, y el webview puede ir atrasado: un evento perdido, una cuenta que
+  cambió, una versión del texto que subió. Si el módulo que manda algo afuera
+  confía en que el frontend no lo llamaría sin permiso, un frontend
+  desincronizado manda datos que nadie aceptó. Por eso cada integración pregunta
+  `consent::granted(..)` **en la función que hace el pedido**, y no en el
+  comando que la dispara. Y revocar descarta lo pendiente: una cola que se
+  vacía después del "no" es una cola que manda después del "no".
 - **`.agent/` es la copia canónica** de la configuración de agentes. Los shims de
   `.claude/` y `.opencode/` que apuntaban ahí se borraron; para recuperar el
   skill en esas herramientas, `git revert 96cf93c`.

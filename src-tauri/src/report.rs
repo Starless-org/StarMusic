@@ -17,7 +17,7 @@
 //!
 //! ## Nothing leaves the machine without being asked for
 //!
-//! `PRODUCT.md` rules that zero telemetry is a constraint and not a setting. A
+//! `PRODUCT.md` rules that analytics is a constraint and not a setting. A
 //! crash reporter that uploads on its own is the thing that promise exists to
 //! rule out. So the app *detects*, the user *reads what would be sent*, and only
 //! then does anything move. `report()` is never called on a timer.

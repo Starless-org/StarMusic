@@ -213,10 +213,10 @@ el audio pero no manda esos eventos, así que la escucha nunca llega a la cuenta
   que en la app oficial.
 - **Sale desde Rust, nunca desde el webview.** Es la misma regla que el audio y
   las credenciales: el backend es la frontera de confianza.
-- **Con permiso.** No es telemetría de Star Music —los datos van a la cuenta de la
+- **Con permiso.** No es analítica de Star Music —los datos van a la cuenta de la
   persona, en el servicio que ella ya usa—, pero sí es algo que sale de la máquina
-  por cada canción, y la regla de cero telemetría existe para que nada salga sin
-  que la persona lo sepa. Por eso la primera vez la app **pregunta** si quiere que
+  por cada canción, así que es una integración con permiso (`PRODUCT.md`,
+  "Consented integrations"). Por eso la primera vez la app **pregunta** si quiere que
   su escucha cuente en Spotify, con un sí y un no del mismo tamaño, y la respuesta
   queda como un ajuste que se puede cambiar en Ajustes. Hasta que la persona
   responde, no se reporta nada.
@@ -279,8 +279,9 @@ respuesta. No están en ninguna versión porque no se han decidido.
 
 Escrito para que no haya que volver a discutirlo.
 
-- **Analytics de uso.** Cero telemetría es una restricción de producto, no una
-  opción. El reporte de crash es la excepción acotada: sólo ocurre tras un crash,
+- **Analytics de uso.** Ningún dato de uso va a Star Music ni a su autor: es una
+  restricción de producto, no una opción. Las integraciones con permiso mandan
+  datos al servicio que eligió la persona, nunca a nosotros. El reporte de crash es la excepción acotada: sólo ocurre tras un crash,
   sólo con un botón, y sólo con el log ya limpiado.
 - **Quitar el feed algorítmico.** El feed se queda. `PRODUCT.md` lo dice
   explícitamente y es una de las tres afirmaciones que un cliente vecino no

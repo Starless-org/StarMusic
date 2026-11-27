@@ -7,6 +7,11 @@
 //! stopped offering to apps like this one. Nothing here opens a socket, and the
 //! person can switch it off or delete it from Settings.
 //!
+//! **Reporting plays to the account is a different thing, and lives elsewhere.**
+//! That integration (PRODUCT.md, "Consented integrations") sends each play as it
+//! happens, with its own permission; it never reads or uploads this file, so
+//! turning one off never touches the other.
+//!
 //! One play per line of JSON, appended. A line is written once a song has been
 //! heard for [`MIN_LISTENED_MS`]; anything shorter was a skip, and counting skips
 //! would rank the songs people pass over.

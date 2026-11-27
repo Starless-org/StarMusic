@@ -64,6 +64,8 @@ and Star Music adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - **Abrir y cerrar paneles y menús usa un solo reloj.** Todos comparten las mismas duraciones y curvas, así que ya no se sienten a ritmos distintos. / Opening and closing panels and menus use one clock. They all share the same durations and curves, so they no longer feel out of step.
 - **El número de pista se esconde detrás del indicador de reproducción.** / The track number hides behind the playing indicator.
 
+- El control de volumen queda centrado bajo el cursor al arrastrarlo. / The volume thumb stays centred under the pointer while dragging.
+
 ## [0.7.0-beta.5] - 2026-11-21
 
 ### New / Nuevo

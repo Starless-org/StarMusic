@@ -208,7 +208,9 @@ export function SmoothSlider({
         onPointerCancel={() => setHeld(false)}
         onBlur={() => setHeld(false)}
         aria-label={label}
-        className="peer absolute inset-0 z-10 w-full cursor-pointer opacity-0 disabled:cursor-default"
+        // Native ranges reserve half a thumb at each end. Extend the invisible
+        // input by that amount so its thumb centre follows the drawing's 0–100%.
+        className="peer absolute inset-y-0 -inset-x-1.5 z-10 m-0 w-[calc(100%+12px)] cursor-pointer appearance-none opacity-0 disabled:cursor-default [&::-moz-range-thumb]:size-3 [&::-moz-range-thumb]:border-0 [&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:appearance-none"
       />
       {/* A full-width track that slides by a percentage of its own width,
           which is the bar's width: the thumb sits at its left edge. */}

@@ -27,6 +27,14 @@ pub struct NowPlaying {
     pub album: String,
     pub artwork: Option<String>,
     pub playing: bool,
+    /// Where the song is, as heard, and how long it lasts as shown. The
+    /// webview has sent both all along for the phone's lock screen; Windows'
+    /// card does not use them, Discord's progress bar does (`discord.rs`).
+    /// Numbers from JavaScript, so `f64`; zero when absent, which is "no bar".
+    #[serde(default, rename = "positionMs")]
+    pub position_ms: f64,
+    #[serde(default, rename = "durationMs")]
+    pub duration_ms: f64,
 }
 
 /// Tell Windows which app this process is, so the media card says "Star Music"

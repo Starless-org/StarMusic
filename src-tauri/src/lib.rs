@@ -15,6 +15,7 @@ mod background;
 mod beat;
 mod consent;
 mod crossfade;
+mod discord;
 mod history;
 mod keycheck;
 mod keyprobe;
@@ -1868,6 +1869,9 @@ fn media_session(
 ) {
     // The tray's first line is the same card, smaller.
     tray::set_playing(&app, now.clone());
+    // Discord says the same thing, from the same answer, and only with the
+    // person's permission: `discord.rs` asks for it before every write.
+    app.state::<discord::DiscordState>().update(now.clone());
     state.update(now);
 }
 
@@ -1978,20 +1982,35 @@ fn consent_status() -> Vec<consent::Status> {
 
 /// The person pressed "Allow" in the permission dialog.
 #[tauri::command]
-fn consent_grant(integration: String) -> Result<Vec<consent::Status>, String> {
+fn consent_grant(
+    integration: String,
+    discord: State<discord::DiscordState>,
+) -> Result<Vec<consent::Status>, String> {
     let integration =
         consent::Integration::from_id(&integration).ok_or("unknown_integration")?;
     consent::grant(integration)?;
+    if integration == consent::Integration::DiscordPresence {
+        // Show the song that is already playing, not the next one.
+        discord.granted();
+    }
     Ok(consent::status())
 }
 
 /// The person switched an integration off. Each integration that keeps
 /// something pending drops it here as well (see `consent::revoke`).
 #[tauri::command]
-fn consent_revoke(integration: String) -> Result<Vec<consent::Status>, String> {
+fn consent_revoke(
+    integration: String,
+    discord: State<discord::DiscordState>,
+) -> Result<Vec<consent::Status>, String> {
     let integration =
         consent::Integration::from_id(&integration).ok_or("unknown_integration")?;
     consent::revoke(integration);
+    if integration == consent::Integration::DiscordPresence {
+        // The grant is gone first, so nothing still queued can go out; then the
+        // status Discord is showing is cleared and the pipe closed.
+        discord.stop();
+    }
     Ok(consent::status())
 }
 
@@ -2271,6 +2290,9 @@ pub fn run() {
 
             // The media keys answer from here on, whatever the window is doing.
             app.manage(media_keys::MediaKeys::start(handle.clone()));
+            // Empty until the person allows it and something plays: no thread,
+            // no pipe, nothing at startup (`discord.rs`).
+            app.manage(discord::DiscordState::default());
 
             // The tray, and then the window's first decision: a launch at
             // sign-in starts in it. Only with a tray to come back from — a

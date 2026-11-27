@@ -61,6 +61,9 @@ jobs:
       # - STAR_MUSIC_REPORT_RELAY: la dirección del relay (`relay/`). No es un
       #   secreto: es una variable del repositorio. Sin ella, el botón de
       #   reportar abre el navegador.
+      # - STAR_MUSIC_DISCORD_APP_ID: el Application ID de Discord (`discord.rs`).
+      #   Tampoco es un secreto. Sin ella, Ajustes no ofrece el estado de
+      #   Discord.
       # - STAR_MUSIC_COMMIT: el commit del tag, para que la app sepa si la release
       #   pública es la misma build que está corriendo. Ver `BUILD_COMMIT` en
       #   `src-tauri/src/lib.rs`. Es el del commit y no el del tag anotado:
@@ -68,6 +71,7 @@ jobs:
       build-env: |
         STAR_MUSIC_CHANNEL=${{ needs.verify.outputs.prerelease == 'true' && 'develop' || 'release' }}
         STAR_MUSIC_REPORT_RELAY=${{ vars.STAR_MUSIC_REPORT_RELAY }}
+        STAR_MUSIC_DISCORD_APP_ID=${{ vars.STAR_MUSIC_DISCORD_APP_ID }}
         STAR_MUSIC_COMMIT=${{ needs.verify.outputs.commit }}
     secrets:
       # La misma llave de siempre: la pública va dentro de cada instalador que

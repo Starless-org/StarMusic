@@ -57,9 +57,9 @@ integración más bajo este mismo modelo de permisos. Dejar esto escrito en
 
 | Fase | PR | Rama | Depende de |
 |---|---|---|---|
-| 0 | Reglas nuevas en los documentos | `feat/consented-integrations` (esta) | — |
-| 1 | Infraestructura de permisos + sección en Ajustes | `feat/consent-infrastructure` | 0 |
-| 2 | Discord Rich Presence | `feat/discord-presence` | 1 |
+| 0 | Reglas nuevas en los documentos — **hecha (#182)** | `feat/consented-integrations` | — |
+| 1 | Infraestructura de permisos + sección en Ajustes — **hecha (#183)** | `feat/consent-infrastructure` | 0 |
+| 2 | Discord Rich Presence — **hecha; falta el Application ID** | `feat/discord-presence` | 1 |
 | 3 | Reportar reproducciones a la cuenta | `feat/report-plays` | 1 (sonda primero) |
 | 4 | Dispositivo Connect | `feat/connect-device` | 1 + **decisión del usuario** |
 
@@ -242,6 +242,19 @@ y después `SET_ACTIVITY`. No hay red propia: lo publica el cliente de Discord.
 Tests: el encoding del frame y el armado de la actividad (sin pipe real).
 
 Commit: `feat(discord): show what is playing in Discord when the person allows it`.
+
+**Lo que se decidió al hacerla:**
+
+- IPC escrito a mano (sin crate): ~200 líneas, sin dependencias nuevas.
+- En pausa, el estado **se borra** (no "En pausa" sin tiempos): el diálogo dice
+  "mientras suena algo".
+- La posición se toma cuando cambia la canción o el play/pausa; un salto dentro
+  de la canción no mueve la barra de Discord.
+- El DJ hablando muestra su nombre, sin artista, sin portada y sin barra.
+- Sólo Windows por ahora; Linux y macOS usan un socket Unix.
+- Falta: crear la aplicación en el portal de Discord y cargar su ID como la
+  variable del repositorio `STAR_MUSIC_DISCORD_APP_ID`. Sin ella, la integración
+  no aparece en Ajustes.
 
 ---
 

@@ -23,7 +23,7 @@
 //! playing" and not a second path from the webview that could disagree. The
 //! progress comes from the position the webview sends, which is the one that is
 //! heard (see the crossfade trap in AGENTS.md), and it is taken when the song
-//! or the play state changes: a seek inside a song does not move it.
+//! or the play state changes, and when the heard position jumps after a seek.
 //!
 //! **Paused is nothing.** The status is cleared on pause and comes back on
 //! play: the dialog promises "while something plays".
@@ -64,10 +64,35 @@ const TEXT_MAX: usize = 128;
 /// And image URLs longer than 256.
 const IMAGE_MAX: usize = 256;
 
-/// Discord allows five `SET_ACTIVITY` every twenty seconds; one every four
-/// keeps inside that however fast the person skips. The latest one waits and
-/// wins: a skipped song never needs to be shown.
-const MIN_GAP: std::time::Duration = std::time::Duration::from_secs(4);
+/// Permit normal pause/resume/seek bursts without a fixed four-second delay,
+/// while retaining the existing five-updates-per-twenty-seconds budget.
+#[cfg(any(windows, test))]
+#[derive(Default)]
+struct ActivityLimit {
+    sent: std::collections::VecDeque<std::time::Instant>,
+}
+
+#[cfg(any(windows, test))]
+impl ActivityLimit {
+    fn wait(&mut self, at: std::time::Instant) -> std::time::Duration {
+        let window = std::time::Duration::from_secs(20);
+        while self
+            .sent
+            .front()
+            .is_some_and(|sent| at.duration_since(*sent) >= window)
+        {
+            self.sent.pop_front();
+        }
+        if self.sent.len() < 5 {
+            return std::time::Duration::ZERO;
+        }
+        (self.sent[self.sent.len() - 5] + window).saturating_duration_since(at)
+    }
+
+    fn record(&mut self, at: std::time::Instant) {
+        self.sent.push_back(at);
+    }
+}
 const RECONNECT_EVERY: std::time::Duration = std::time::Duration::from_secs(15);
 
 enum Message {
@@ -91,6 +116,12 @@ impl DiscordState {
     pub fn update(&self, now: Option<NowPlaying>) {
         if let Ok(mut last) = self.last.lock() {
             *last = now.clone();
+        }
+        // A seek reloads audio and briefly changes position/play state. Keep
+        // the published clock until the player reports its settled position.
+        if now.as_ref().is_some_and(|now| now.loading) {
+            log::debug!("discord: estado intermedio de carga descartado");
+            return;
         }
         if available() && consent::granted(Integration::DiscordPresence) {
             self.send(Message::Show(now));
@@ -200,6 +231,37 @@ fn activity(now: Option<&NowPlaying>, at_ms: i64) -> Option<Value> {
     Some(activity)
 }
 
+/// Loading and native media-card updates can repeat the same Discord activity.
+/// Sampling jitter in the clock anchor must not spend another publication.
+fn equivalent_activity(left: &Option<Value>, right: &Option<Value>) -> bool {
+    if left == right {
+        return true;
+    }
+    let (Some(left), Some(right)) = (left, right) else {
+        return false;
+    };
+    let mut left_fields = left.clone();
+    let mut right_fields = right.clone();
+    let (Some(left_fields), Some(right_fields)) =
+        (left_fields.as_object_mut(), right_fields.as_object_mut())
+    else {
+        return false;
+    };
+    left_fields.remove("timestamps");
+    right_fields.remove("timestamps");
+    left_fields == right_fields
+        && ["start", "end"].iter().all(|field| {
+            match (
+                left["timestamps"][field].as_i64(),
+                right["timestamps"][field].as_i64(),
+            ) {
+                (Some(left), Some(right)) => left.abs_diff(right) <= 1000,
+                (None, None) => true,
+                _ => false,
+            }
+        })
+}
+
 /// One frame of the pipe protocol.
 fn frame(opcode: u32, payload: &Value) -> Vec<u8> {
     let body = payload.to_string().into_bytes();
@@ -228,7 +290,8 @@ mod pipe {
     use serde_json::{Value, json};
 
     use super::{
-        MIN_GAP, Message, RECONNECT_EVERY, activity, app_id, frame, set_activity,
+        ActivityLimit, Message, RECONNECT_EVERY, activity, app_id, equivalent_activity, frame,
+        set_activity,
     };
     use crate::consent::{self, Integration};
 
@@ -254,7 +317,8 @@ mod pipe {
                     .ok()
             })?;
             let mut pipe = Pipe { file, nonce: 0 };
-            pipe.write(HANDSHAKE, &json!({ "v": 1, "client_id": id })).ok()?;
+            pipe.write(HANDSHAKE, &json!({ "v": 1, "client_id": id }))
+                .ok()?;
             match pipe.read() {
                 Ok((FRAME, _)) => Some(pipe),
                 Ok((CLOSE, reply)) => {
@@ -313,39 +377,60 @@ mod pipe {
         let mut pipe: Option<Pipe> = None;
         // What should be on the status, and whether Discord has it yet.
         let mut wanted: Option<Value> = None;
+        let mut shown: Option<Value> = None;
         let mut dirty = false;
-        let mut last_sent: Option<Instant> = None;
+        let mut settled_at = Instant::now();
+        let mut limit = ActivityLimit::default();
         let mut next_connect = Instant::now();
 
         loop {
             let wait = if !dirty {
                 Duration::from_secs(3600)
             } else {
-                let throttle = last_sent
-                    .map(|at| (at + MIN_GAP).saturating_duration_since(Instant::now()))
-                    .unwrap_or_default();
+                let throttle = limit.wait(Instant::now());
                 let reconnect = if pipe.is_none() {
                     next_connect.saturating_duration_since(Instant::now())
                 } else {
                     Duration::ZERO
                 };
-                throttle.max(reconnect)
+                throttle
+                    .max(reconnect)
+                    .max(settled_at.saturating_duration_since(Instant::now()))
             };
 
             match rx.recv_timeout(wait) {
                 Ok(Message::Show(now)) => {
-                    wanted = activity(now.as_ref(), now_ms());
-                    dirty = true;
-                    continue_if_more(&rx, &mut wanted, &mut dirty, &mut pipe);
+                    let next = activity(now.as_ref(), now_ms());
+                    if equivalent_activity(&wanted, &next) {
+                        log::debug!("discord: actividad repetida descartada");
+                        continue;
+                    }
+                    wanted = next;
+                    dirty = !equivalent_activity(&shown, &wanted);
+                    // Let a burst of seeks settle before publishing its final
+                    // position. Clearing on pause has no settling delay.
+                    settled_at = Instant::now()
+                        + if wanted.is_some() {
+                            Duration::from_millis(250)
+                        } else {
+                            Duration::ZERO
+                        };
+                    log::debug!(
+                        "discord: cambio pendiente, cupo espera {} ms",
+                        limit.wait(Instant::now()).as_millis()
+                    );
+                    continue;
                 }
                 Ok(Message::Stop) => {
                     if let Some(mut open) = pipe.take() {
                         // Clearing removes data, it does not send any: no grant
                         // needed, and it is the whole point of the stop.
                         let _ = open.set(None);
+                        limit.record(Instant::now());
                         log::info!("discord: estado borrado, permiso retirado");
                     }
                     wanted = None;
+                    shown = None;
                     dirty = false;
                     continue;
                 }
@@ -356,15 +441,17 @@ mod pipe {
             if !dirty {
                 continue;
             }
-            if last_sent.is_some_and(|at| at.elapsed() < MIN_GAP) {
+            if !limit.wait(Instant::now()).is_zero() {
                 continue;
             }
             // The gate, where the byte leaves (AGENTS.md).
             if !consent::granted(Integration::DiscordPresence) {
                 if let Some(mut open) = pipe.take() {
                     let _ = open.set(None);
+                    limit.record(Instant::now());
                 }
                 wanted = None;
+                shown = None;
                 dirty = false;
                 continue;
             }
@@ -387,43 +474,22 @@ mod pipe {
                 }
             }
             if let Some(open) = pipe.as_mut() {
+                // A write can reach Discord even when its reply is lost.
+                limit.record(Instant::now());
                 match open.set(wanted.clone()) {
                     Ok(()) => {
+                        shown = wanted.clone();
                         dirty = false;
-                        last_sent = Some(Instant::now());
+                        log::debug!("discord: actualización publicada");
                     }
                     Err(e) => {
                         // Discord closed: retry on the next round, the status
                         // still wanted.
                         log::info!("discord: se cerró la conexión: {e}");
                         pipe = None;
+                        shown = None;
                         next_connect = Instant::now() + RECONNECT_EVERY;
                     }
-                }
-            }
-        }
-    }
-
-    /// Take whatever else is already waiting before writing: a burst of skips
-    /// is one status, the last one.
-    fn continue_if_more(
-        rx: &Receiver<Message>,
-        wanted: &mut Option<Value>,
-        dirty: &mut bool,
-        pipe: &mut Option<Pipe>,
-    ) {
-        while let Ok(message) = rx.try_recv() {
-            match message {
-                Message::Show(now) => {
-                    *wanted = activity(now.as_ref(), now_ms());
-                    *dirty = true;
-                }
-                Message::Stop => {
-                    if let Some(mut open) = pipe.take() {
-                        let _ = open.set(None);
-                    }
-                    *wanted = None;
-                    *dirty = false;
                 }
             }
         }
@@ -434,6 +500,39 @@ mod pipe {
 mod tests {
     use super::*;
 
+    #[test]
+    fn normal_pause_resume_bursts_do_not_wait_four_seconds() {
+        let at = std::time::Instant::now();
+        let mut limit = ActivityLimit::default();
+        for seconds in 0..5 {
+            let now = at + std::time::Duration::from_secs(seconds);
+            assert!(limit.wait(now).is_zero());
+            limit.record(now);
+        }
+        assert_eq!(
+            limit.wait(at + std::time::Duration::from_secs(5)),
+            std::time::Duration::from_secs(15)
+        );
+        assert!(
+            limit
+                .wait(at + std::time::Duration::from_secs(20))
+                .is_zero()
+        );
+    }
+
+    #[test]
+    fn clearing_on_revoke_still_counts_against_the_next_grant() {
+        let at = std::time::Instant::now();
+        let mut limit = ActivityLimit::default();
+        for seconds in 0..6 {
+            limit.record(at + std::time::Duration::from_secs(seconds));
+        }
+        assert_eq!(
+            limit.wait(at + std::time::Duration::from_secs(20)),
+            std::time::Duration::from_secs(1)
+        );
+    }
+
     fn song() -> NowPlaying {
         NowPlaying {
             title: "Duvet".into(),
@@ -441,9 +540,64 @@ mod tests {
             album: "Twilight".into(),
             artwork: Some("https://i.scdn.co/image/abc".into()),
             playing: true,
+            loading: false,
             position_ms: 30_000.0,
             duration_ms: 200_000.0,
         }
+    }
+
+    #[test]
+    fn repeated_media_updates_do_not_publish_the_same_activity_again() {
+        let first = activity(Some(&song()), 1_000_000);
+        let mut tick = song();
+        tick.position_ms += 500.0;
+        let next = activity(Some(&tick), 1_000_500);
+        assert!(equivalent_activity(&first, &next));
+        // A delayed sample of the same clock is still the same activity.
+        assert!(equivalent_activity(
+            &first,
+            &activity(Some(&tick), 1_000_700)
+        ));
+        assert!(equivalent_activity(&None, &None));
+    }
+
+    #[test]
+    fn seeks_pause_and_metadata_changes_are_distinct_activities() {
+        let first = activity(Some(&song()), 1_000_000);
+        let mut changed = song();
+        changed.position_ms = 90_000.0;
+        assert!(!equivalent_activity(
+            &first,
+            &activity(Some(&changed), 1_000_500)
+        ));
+        changed.position_ms = 5_000.0;
+        assert!(!equivalent_activity(
+            &first,
+            &activity(Some(&changed), 1_000_500)
+        ));
+        changed = song();
+        changed.artist = "Another artist".into();
+        assert!(!equivalent_activity(
+            &first,
+            &activity(Some(&changed), 1_000_000)
+        ));
+        assert!(!equivalent_activity(&first, &None));
+    }
+
+    #[test]
+    fn old_media_payloads_are_settled_by_default() {
+        let old: NowPlaying = serde_json::from_value(json!({
+            "title": "Duvet", "artist": "bôa", "album": "Twilight",
+            "artwork": null, "playing": true
+        }))
+        .unwrap();
+        assert!(!old.loading);
+        let loading: NowPlaying = serde_json::from_value(json!({
+            "title": "Duvet", "artist": "bôa", "album": "Twilight",
+            "artwork": null, "playing": false, "loading": true
+        }))
+        .unwrap();
+        assert!(loading.loading);
     }
 
     #[test]
@@ -460,7 +614,10 @@ mod tests {
         assert_eq!(activity["type"], 2);
         assert_eq!(activity["details"], "Duvet");
         assert_eq!(activity["state"], "bôa");
-        assert_eq!(activity["assets"]["large_image"], "https://i.scdn.co/image/abc");
+        assert_eq!(
+            activity["assets"]["large_image"],
+            "https://i.scdn.co/image/abc"
+        );
         assert_eq!(activity["assets"]["large_text"], "Twilight");
         assert_eq!(activity["timestamps"]["start"], 970_000);
         assert_eq!(activity["timestamps"]["end"], 1_170_000);
@@ -484,6 +641,7 @@ mod tests {
             album: String::new(),
             artwork: None,
             playing: true,
+            loading: false,
             position_ms: 0.0,
             duration_ms: 0.0,
         };
@@ -508,10 +666,16 @@ mod tests {
     fn a_cover_discord_would_refuse_falls_back_to_the_icon() {
         let mut long = song();
         long.artwork = Some(format!("https://{}", "a".repeat(300)));
-        assert_eq!(activity(Some(&long), 0).unwrap()["assets"]["large_image"], FALLBACK_IMAGE);
+        assert_eq!(
+            activity(Some(&long), 0).unwrap()["assets"]["large_image"],
+            FALLBACK_IMAGE
+        );
         let mut plain = song();
         plain.artwork = Some("http://insecure".into());
-        assert_eq!(activity(Some(&plain), 0).unwrap()["assets"]["large_image"], FALLBACK_IMAGE);
+        assert_eq!(
+            activity(Some(&plain), 0).unwrap()["assets"]["large_image"],
+            FALLBACK_IMAGE
+        );
     }
 
     /// The webview sends camelCase, as it always has for the phone; a rename

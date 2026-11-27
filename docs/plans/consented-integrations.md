@@ -248,8 +248,16 @@ Commit: `feat(discord): show what is playing in Discord when the person allows i
 - IPC escrito a mano (sin crate): ~200 líneas, sin dependencias nuevas.
 - En pausa, el estado **se borra** (no "En pausa" sin tiempos): el diálogo dice
   "mientras suena algo".
-- La posición se toma cuando cambia la canción o el play/pausa; un salto dentro
-  de la canción no mueve la barra de Discord.
+- La posición se envía cuando cambia la canción, el play/pausa o la posición
+  se aparta más de un segundo de su avance esperado. Así los saltos actualizan
+  Discord sin enviar cada tick del reproductor. Hasta cinco cambios en una
+  ventana de veinte segundos salen sin una espera fija; si se agota ese cupo,
+  queda pendiente el estado más reciente.
+- Las transiciones de carga no se publican en Discord. El backend descarta
+  actividades equivalentes, tolerando un segundo de variación del reloj, y
+  agrupa los cambios de posición durante 250 ms. Pausar no espera esa agrupación.
+  Los cinco envíos por veinte segundos son el presupuesto conservador de la
+  app; falta medir por separado el límite que aplica el cliente de Discord.
 - El DJ hablando muestra su nombre, sin artista, sin portada y sin barra.
 - Sólo Windows por ahora; Linux y macOS usan un socket Unix.
 - Falta: crear la aplicación en el portal de Discord y cargar su ID como la

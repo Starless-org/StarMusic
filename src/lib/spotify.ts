@@ -716,7 +716,7 @@ export type NowPlaying = {
   album: string;
   artwork: string | null;
   playing: boolean;
-  /** The phone's only: see `useMediaSession`. Rust ignores what it does not declare. */
+  /** Keeps the phone awake; Discord waits for loading to settle before publishing. */
   loading?: boolean;
   positionMs?: number;
   durationMs?: number;

@@ -27,6 +27,10 @@ pub struct NowPlaying {
     pub album: String,
     pub artwork: Option<String>,
     pub playing: bool,
+    /// Loading is an intermediate state during a seek, not a new Discord
+    /// activity. Older frontend payloads omit it and keep their old behaviour.
+    #[serde(default)]
+    pub loading: bool,
     /// Where the song is, as heard, and how long it lasts as shown. The
     /// webview has sent both all along for the phone's lock screen; Windows'
     /// card does not use them, Discord's progress bar does (`discord.rs`).

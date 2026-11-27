@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { mediaTimelineMoved } from "./mediaTimeline";
 import {
   coverImage,
   lastPlaybackStatus,
@@ -207,10 +208,10 @@ export function nowPlayingOf(
  * The DJ counts as something playing, like it does for the bar: the voice is
  * on, and the keys are how a person skips it.
  *
- * `loading` and the position only matter to the phone. A song that is loading
+ * `loading` keeps the phone awake. A song that is loading
  * is a song that will play, so the phone keeps the processor awake through it;
- * the position goes with each change of state and not with each tick, because
- * the lock screen moves its own bar from the last one it was given.
+ * the position goes with state changes and seeks. The lock screen and Discord
+ * advance their own clocks between updates.
  */
 export function useMediaSession(
   track: Track | null,
@@ -222,14 +223,36 @@ export function useMediaSession(
   durationMs = 0,
 ) {
   const { title, artist, album, artwork, on, seekable } = describe(track, dj, playing, djLabel);
-  const at = useRef({ positionMs, durationMs });
-  at.current = { positionMs, durationMs };
+  const last = useRef<{
+    key: string;
+    positionMs: number;
+    playing: boolean;
+    at: number;
+  } | null>(null);
+  const trackId = track?.id;
 
   useEffect(() => {
+    const at = performance.now();
+    const key = JSON.stringify([
+      trackId,
+      title,
+      artist,
+      album,
+      artwork,
+      on,
+      loading,
+      seekable,
+      durationMs,
+    ]);
+    if (last.current?.key === key && !mediaTimelineMoved(last.current, positionMs, at)) return;
+    const snapshot = { key, positionMs, playing: on, at };
+    last.current = snapshot;
     void mediaSession(
       title === null
         ? null
-        : { title, artist, album, artwork, playing: on, loading, seekable, ...at.current },
-    ).catch(() => {});
-  }, [title, artist, album, artwork, on, loading, seekable]);
+        : { title, artist, album, artwork, playing: on, loading, seekable, positionMs, durationMs },
+    ).catch(() => {
+      if (last.current === snapshot) last.current = null;
+    });
+  }, [trackId, title, artist, album, artwork, on, loading, seekable, positionMs, durationMs]);
 }

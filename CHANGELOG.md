@@ -32,6 +32,10 @@ and Star Music adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ## [Sin publicar]
 
+### New / Nuevo
+
+- **Puedes mostrar en Discord lo que suena, si lo permites.** En Ajustes → Cuenta → Conexiones, un interruptor abre un permiso que dice qué sale —título, artista, álbum, portada y por dónde va la canción—, a quién —la app de Discord de tu computadora y quien vea tu estado— y cuándo. Viene apagado, nada va a Star Music, y apagarlo borra el estado en el acto. Con la canción en pausa no se muestra nada. Por ahora, sólo en Windows. / You can show what's playing on Discord, if you allow it. In Settings → Account → Connections, a switch opens a permission that says what leaves —title, artist, album, cover and how far in the song is—, who gets it —the Discord app on your computer and anyone who sees your status— and when. It starts off, nothing goes to Star Music, and turning it off clears the status at once. Nothing shows while the song is paused. Windows only, for now.
+
 ### Fixed / Corregido
 
 - **Desde una beta, la release final se ofrece como actualización y no como volver atrás.** La comparación de versiones leía `0.7.0-beta.5` como más nueva que `0.7.0`, así que Ajustes decía «Volver a la 0.7.0» a quien estaba avanzando hacia ella. Ahora una beta es anterior a su release, y el botón dice «Actualizar». / From a beta, the final release is offered as an update, not as going back. The version comparison read `0.7.0-beta.5` as newer than `0.7.0`, so Settings said "Go back to 0.7.0" to someone moving toward it. A beta now comes before its release, and the button says "Update".

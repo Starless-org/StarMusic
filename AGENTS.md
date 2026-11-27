@@ -78,7 +78,8 @@ src-tauri/src/
   soloist.rs              Spotify Soloist para esas cuentas: descarga, clave, proceso y WebSocket
   settings.rs             lo que sobrevive a un reinicio
   logging.rs              el log local con rotación
-  consent.rs              los permisos de cada integración (todavía no existe: plan en docs/plans/)
+  consent.rs              los permisos de cada integración: qué dejó salir la persona
+  discord.rs              el estado de Discord, por el pipe local, sólo con permiso
 relay/                    el Worker que recibe los reportes y crea los issues
 landing-redirect/         el Worker que lleva la dirección vieja de la landing al sitio de Starless
 .agent/                   configuración de agentes (Claude Code y OpenCode)

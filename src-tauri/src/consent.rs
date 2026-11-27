@@ -36,7 +36,7 @@ use std::collections::BTreeMap;
 pub enum Integration {
     /// The plays heard here count on the account (Phase 3 of the plan).
     SpotifyPlays,
-    /// Discord shows what is playing (Phase 2).
+    /// Discord shows what is playing (`discord.rs`).
     DiscordPresence,
     /// Other devices of the account see and control Star Music. Undecided in
     /// PRODUCT.md, so never available outside the preview below.
@@ -95,7 +95,7 @@ impl Integration {
         }
         match self {
             Integration::SpotifyPlays => false,
-            Integration::DiscordPresence => false,
+            Integration::DiscordPresence => crate::discord::available(),
             Integration::ConnectDevice => false,
         }
     }
@@ -142,10 +142,6 @@ fn is_granted(grants: &BTreeMap<String, Grant>, integration: Integration) -> boo
 /// **The question every integration asks before it sends.** Reads the file each
 /// time on purpose: a cached answer is exactly how a revoke would fail to stop
 /// the next request.
-#[expect(
-    dead_code,
-    reason = "the integrations that ask arrive in the next phases; this turns into an error the moment one does, so it cannot outlive them"
-)]
 pub fn granted(integration: Integration) -> bool {
     is_granted(&crate::settings::load().consents, integration)
 }
@@ -269,14 +265,15 @@ mod tests {
         assert_eq!(Integration::from_id("analytics"), None);
     }
 
-    /// Release builds ship with nothing to switch on until an integration exists.
+    /// An integration is only offered once its code exists. Discord exists, but
+    /// only in a build that carries its Application ID.
     #[test]
     fn no_integration_is_available_before_its_code_exists() {
         if preview() {
             return;
         }
-        for integration in ALL {
-            assert!(!integration.available(), "{}", integration.id());
-        }
+        assert!(!Integration::SpotifyPlays.available());
+        assert!(!Integration::ConnectDevice.available());
+        assert_eq!(Integration::DiscordPresence.available(), crate::discord::available());
     }
 }

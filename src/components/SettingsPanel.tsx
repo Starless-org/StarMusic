@@ -53,10 +53,12 @@ import {
   audioQuality,
   BACKGROUND_DEFAULT,
   BACKGROUND_DIM_MAX,
+  type ConsentStatus,
   CROSSFADE_MAX,
   clearBackground,
   clearHistory,
   closeToTray,
+  consentStatus,
   crossfadeSeconds,
   EFFECTS,
   EFFECTS_DEFAULT,
@@ -64,11 +66,14 @@ import {
   type EffectName,
   type Effects,
   explain,
+  grantConsent,
   historyEnabled,
   historyKey,
+  type IntegrationId,
   normalisation,
   pickBackground,
   resetCustomisation,
+  revokeConsent,
   type SoloistStatus,
   SURFACE_OPACITY_DEFAULT,
   SURFACE_OPACITY_MAX,
@@ -116,6 +121,7 @@ import {
   isPublicBuild,
   subscribePublicBuild,
 } from "../lib/version";
+import { ConsentDialog, consentTitle } from "./ConsentDialog";
 import { DevPanel } from "./DevPanel";
 import { Select } from "./Select";
 import { SmoothSlider } from "./SmoothSlider";
@@ -2297,6 +2303,7 @@ function Account({ t, account }: { t: Record<StringKey, string>; account: UserAc
           </>
         )}
       </Group>
+      <Connections t={t} />
       <div className="mt-5">
         <button
           type="button"
@@ -2307,6 +2314,96 @@ function Account({ t, account }: { t: Record<StringKey, string>; account: UserAc
           {t.signOut}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** The hint under each integration's row, by id. The rest of its words live in `ConsentDialog`. */
+const CONSENT_HINTS: Record<IntegrationId, StringKey> = {
+  spotify_plays: "consentSpotifyPlaysHint",
+  discord_presence: "consentDiscordPresenceHint",
+  connect_device: "consentConnectDeviceHint",
+};
+
+/**
+ * What the person allowed to leave the machine (PRODUCT.md, "Consented
+ * integrations"), in the account section because most of it is the account's.
+ *
+ * **Switching one on is not a click: it is a dialog.** The switch opens the
+ * permission, and only "Allow" turns it on, so nobody grants anything without
+ * having had what leaves in front of them. Switching one off is a click: taking
+ * back a yes should never be harder than giving it.
+ *
+ * **The switch draws what the backend answered, not what was pressed.** Every
+ * change comes back with the whole status, so a grant the backend refused does
+ * not leave a switch that looks on.
+ *
+ * Only the integrations this build has are drawn. With none, there are no rows,
+ * and the wrapper hides itself the same way a `Group` does: a heading over an
+ * empty card would announce something the app cannot do.
+ */
+function Connections({ t }: { t: Record<StringKey, string> }) {
+  const [statuses, setStatuses] = useState<ConsentStatus[]>([]);
+  const [asking, setAsking] = useState<IntegrationId | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void consentStatus()
+      .then((answer) => {
+        if (alive) setStatuses(answer);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const answer = (change: Promise<ConsentStatus[]>) => {
+    setFailure(null);
+    void change.then(setStatuses).catch((error) => {
+      setFailure(explain(error));
+      void consentStatus()
+        .then(setStatuses)
+        .catch(() => {});
+    });
+  };
+  const closeDialog = useCallback(() => setAsking(null), []);
+
+  return (
+    <div className="mt-5 not-has-[.setting-row]:hidden">
+      <h3 className="px-1 text-[13px] font-semibold">{t.connectionsTitle}</h3>
+      <p className="mt-0.5 mb-2.5 px-1 text-[12px] text-ink-muted">{t.connectionsHint}</p>
+      <Group>
+        {statuses
+          .filter((status) => status.available)
+          .map((status) => (
+            <Row
+              key={status.id}
+              label={consentTitle(t, status.id)}
+              hint={t[CONSENT_HINTS[status.id]]}
+            >
+              <Toggle
+                checked={status.granted}
+                onChange={(on) => (on ? setAsking(status.id) : answer(revokeConsent(status.id)))}
+                label={consentTitle(t, status.id)}
+              />
+            </Row>
+          ))}
+      </Group>
+      {failure && (
+        <p role="alert" className="mt-2 px-1 text-[12px] text-warn-ink">
+          {failure}
+        </p>
+      )}
+      <ConsentDialog
+        t={t}
+        integration={asking}
+        onClose={closeDialog}
+        onAllow={(integration) => {
+          setAsking(null);
+          answer(grantConsent(integration));
+        }}
+      />
     </div>
   );
 }

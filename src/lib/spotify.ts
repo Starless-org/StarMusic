@@ -907,6 +907,37 @@ export async function clearHistory(): Promise<void> {
   return invoke<void>("clear_history");
 }
 
+/**
+ * The integrations that send something off this machine, with the person's
+ * permission (PRODUCT.md, "Consented integrations"; `consent.rs`).
+ *
+ * **The webview only ever learns booleans.** Whether an integration may send is
+ * decided in Rust, at the moment it sends; these switches are how the person
+ * says yes or no, not the gate itself.
+ */
+export type IntegrationId = "spotify_plays" | "discord_presence" | "connect_device";
+
+export type ConsentStatus = {
+  id: IntegrationId;
+  /** This build can do it. Settings only draws the ones that can. */
+  available: boolean;
+  granted: boolean;
+};
+
+/** No backend, no integrations: nothing to send and nothing to switch. */
+export async function consentStatus(): Promise<ConsentStatus[]> {
+  if (!hasBackend()) return [];
+  return invoke<ConsentStatus[]>("consent_status");
+}
+
+export async function grantConsent(integration: IntegrationId): Promise<ConsentStatus[]> {
+  return invoke<ConsentStatus[]>("consent_grant", { integration });
+}
+
+export async function revokeConsent(integration: IntegrationId): Promise<ConsentStatus[]> {
+  return invoke<ConsentStatus[]>("consent_revoke", { integration });
+}
+
 /** Mirrors `settings::AUDIO_QUALITIES`. */
 export type AudioQuality = "low" | "normal" | "high";
 

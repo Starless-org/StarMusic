@@ -25,7 +25,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The ids of the listening events (`spclient/plays.rs`). Already in the tree
 # through librespot, so naming it here builds nothing new.
-rand = "0.9"
+rand = "0.10"
 
 # librespot, split per concern rather than the single umbrella crate, so a
 # breakage in one area is patched in one file.

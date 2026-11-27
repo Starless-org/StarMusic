@@ -65,13 +65,25 @@ está escrito de cero sobre esos números, no copiado.
 - `reason_start` es siempre `clickrow`: la app no distingue todavía una canción
   que siguió sola de una que se eligió.
 
-## Lo que falta medir
+## Lo medido con esta app
 
-**Esto es lo que hay que hacer antes de dar la función por buena:** con una
-build de desarrollo, encender el permiso, escuchar tres canciones enteras y
-una cortada a los 40 segundos, y mirar en el teléfono «Reproducido
-recientemente». El log dice, por canción, `escuchas: reportada una canción de
-N s (audio_id: sí)`, o por qué no salió. Anotar acá el resultado, con la fecha.
+**27 de noviembre de 2026**, con una cuenta Premium que suena por librespot, en
+una build de desarrollo de `feat/report-plays`, Windows 11: seis canciones
+escuchadas enteras, de 161 a 214 segundos. En el log, las seis:
+`escuchas: reportada una canción de N s (audio_id: sí)`, un segundo después de
+que terminó cada una, sin rechazos dentro de la respuesta del servicio de
+eventos y con `200` en `herodotus`. Las canciones aparecieron en «Reproducido
+recientemente» de la cuenta.
+
+**Lo que no se midió todavía:**
+
+- **Una canción cortada entre los 30 segundos y el final** (`reason_end` =
+  `endplay`). librespot#626 cuenta que, hace años, el servicio sólo tomaba las
+  que terminaban solas.
+- **Si cuentan en los minutos y en las estadísticas**, y no sólo en la
+  historia: eso se ve días después, no en el momento.
+
+Cuando se midan, se anotan acá con la fecha.
 
 ## El precio
 

@@ -60,7 +60,7 @@ integración más bajo este mismo modelo de permisos. Dejar esto escrito en
 | 0 | Reglas nuevas en los documentos — **hecha (#182)** | `feat/consented-integrations` | — |
 | 1 | Infraestructura de permisos + sección en Ajustes — **hecha (#183)** | `feat/consent-infrastructure` | 0 |
 | 2 | Discord Rich Presence — **hecha; falta el Application ID** | `feat/discord-presence` | 1 |
-| 3 | Reportar reproducciones a la cuenta — **escrita; falta medirla en la cuenta** (`docs/reportar-reproducciones.md`) | `feat/report-plays` | 1 |
+| 3 | Reportar reproducciones a la cuenta — **hecha y medida el 27/11/2026** (`docs/reportar-reproducciones.md`) | `feat/report-plays` | 1 |
 | 4 | Dispositivo Connect | `feat/connect-device` | 1 + **decisión del usuario** |
 
 Fases 2 y 3 son independientes entre sí una vez mergeada la 1.

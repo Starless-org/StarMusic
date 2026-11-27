@@ -52,8 +52,10 @@ mantiene baja mientras suena.
 - **Cola de reproducción**, con lo que suena y lo que sigue.
 - **Agregar a una playlist** y crear una playlist desde ahí mismo.
 - **Interfaz bilingüe**, español e inglés, con selector.
-- **Cero telemetría.** Star Music no reporta datos de uso a nadie, tampoco a su
-  autor.
+- **Nada sale sin tu permiso.** Star Music no reporta datos de uso a nadie,
+  tampoco a su autor. Lo que comparte tu escucha con un servicio que ya usas —tu
+  cuenta de Spotify, Discord— viene apagado y te dice qué manda antes de
+  encenderlo.
 - **Actualizaciones automáticas:** comprueba si hay versión nueva al abrir y
   tú decides cuándo instalarla. Una app que corta la música para instalar un
   parche es una app que la gente apaga.
@@ -191,8 +193,9 @@ release en borrador; sólo falta darle a *Publish release*.
   Asume que habrá un corte de varios días por causas que no están en este
   proyecto. Todo lo que habla con librespot está detrás de una capa fina, para
   que una ruptura se arregle en un lugar.
-- **Sin telemetría es una restricción, no un ajuste.** Agregar analítica después
-  significa retirar una promesa ya hecha.
+- **Sin analítica es una restricción, no un ajuste.** Agregarla significa
+  retirar una promesa ya hecha. Lo demás que sale de la máquina es una
+  integración que la persona enciende, una por una, y puede apagar.
 - **Windows primero.** macOS y Linux siguen el camino; falta probarlos en serio.
 - **La firma de código de los instaladores está pendiente.** SmartScreen va a
   avisar hasta que se resuelva.
@@ -251,8 +254,10 @@ music plays.
 - **A play queue**, with what is playing and what is next.
 - **Adding to a playlist**, and creating a playlist from there.
 - **A bilingual interface**, Spanish and English, with a selector.
-- **Zero telemetry.** Star Music reports usage data to nobody, including its
-  author.
+- **Nothing leaves without your say-so.** Star Music reports usage data to
+  nobody, including its author. What shares your listening with a service you
+  already use — your Spotify account, Discord — comes switched off and tells you
+  what it sends before you turn it on.
 - **Automatic updates:** it checks for a new version when it opens, and you
   decide when to install it. An app that cuts the music to install a patch is
   an app people turn off.
@@ -391,8 +396,9 @@ leaves the release as a draft; all that is left is clicking *Publish release*.
   specification. Assume a multi-day outage will eventually happen for reasons
   outside this project. Everything that talks to librespot sits behind a thin
   layer, so a breakage is patched in one place.
-- **No telemetry is a constraint, not a setting.** Adding analytics later means
-  retracting a promise already made.
+- **No analytics is a constraint, not a setting.** Adding it means retracting a
+  promise already made. Anything else that leaves the machine is an integration
+  the person turns on, one by one, and can turn off.
 - **Windows first.** macOS and Linux follow; neither has been properly tested
   yet.
 - **Installer code signing is still pending.** SmartScreen will warn until that

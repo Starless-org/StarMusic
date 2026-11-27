@@ -86,7 +86,7 @@ const artistNames = (play: Play) => play.artists.map((artist) => artist.name).jo
  * recommendation engine and "recently played" were reachable only through the
  * Web API that stopped serving apps like this one. `history.rs` keeps what was
  * heard on this computer and nowhere else, which is why the section says so
- * under its title: PRODUCT.md promises zero telemetry, and a history that never
+ * under its title: PRODUCT.md promises nothing leaves without consent, and a history that never
  * leaves the disk keeps the promise. Before anything was heard, those sections
  * are one card that says how they fill in.
  *

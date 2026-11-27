@@ -44,6 +44,6 @@
 - [ ] The title, the commits and this description are in English
 - [ ] The user-facing text is in `lib/i18n.ts`, in both languages
 - [ ] It does not touch the audio, the startup or the memory use
-- [ ] It adds no telemetry and no external service that reports usage data
+- [ ] It adds no analytics, and anything new that leaves the machine is a consented integration listed in `PRODUCT.md`
 - [ ] It does not use the name, the brand or the logo of Spotify
 - [ ] It does not move the audio to a webview API

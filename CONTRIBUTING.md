@@ -15,7 +15,7 @@ Read these two files first. They are not decorative documentation: they are the
 constraints the code has to respect.
 
 - **[`PRODUCT.md`](PRODUCT.md)** — qué es el producto, quién lo usa, y qué no
-  se negocia: Premium obligatorio, cero telemetría, el audio no pasa por la
+  se negocia: Premium obligatorio, nada sale sin permiso, el audio no pasa por la
   webview.
 - **[`DESIGN.md`](DESIGN.md)** — el sistema visual y su presupuesto de
   rendimiento. Si tocas una superficie de UI, este archivo dice cómo se hace y
@@ -323,8 +323,10 @@ otro. Nunca inline en un componente.
 sistema. Mover el audio a una API del webview rompe la promesa de arranque y la
 de memoria, que son las dos razones por las que existe esta app.
 
-**Sin telemetría.** No es un ajuste: agregar analítica significa retirar una
-promesa ya hecha.
+**Nada sale sin permiso, y nada va al autor.** La analítica no es un ajuste:
+agregarla significa retirar una promesa ya hecha. Lo que sale hacia un servicio
+que eligió la persona es una integración con permiso, con las cuatro condiciones
+de `PRODUCT.md` ("Consented integrations"), y la lista es cerrada.
 
 **Sin el logotipo ni la marca de Spotify.** En ninguna parte, ni en el código,
 ni en la documentación, ni en un issue.

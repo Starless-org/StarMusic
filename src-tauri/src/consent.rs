@@ -34,7 +34,7 @@ use std::collections::BTreeMap;
 /// that is not here does not ship (PRODUCT.md).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Integration {
-    /// The plays heard here count on the account (Phase 3 of the plan).
+    /// The plays heard here count on the account (`spclient/plays.rs`).
     SpotifyPlays,
     /// Discord shows what is playing (`discord.rs`).
     DiscordPresence,
@@ -94,7 +94,7 @@ impl Integration {
             return true;
         }
         match self {
-            Integration::SpotifyPlays => false,
+            Integration::SpotifyPlays => true,
             Integration::DiscordPresence => crate::discord::available(),
             Integration::ConnectDevice => false,
         }
@@ -272,7 +272,7 @@ mod tests {
         if preview() {
             return;
         }
-        assert!(!Integration::SpotifyPlays.available());
+        assert!(Integration::SpotifyPlays.available());
         assert!(!Integration::ConnectDevice.available());
         assert_eq!(Integration::DiscordPresence.available(), crate::discord::available());
     }

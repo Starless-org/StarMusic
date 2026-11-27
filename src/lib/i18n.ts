@@ -113,9 +113,9 @@ export const strings = {
     consentSpotifyPlaysHint:
       "Lo que escuchas aquí aparece en tu historial y tus estadísticas de Spotify.",
     consentSpotifyPlaysWhat:
-      "Cada canción que escuchas: cuál es, desde dónde la pusiste (una playlist, el DJ, la radio) y cuántos segundos sonó de verdad.",
+      "Cada canción que escuchas más de 30 segundos: cuál es, desde qué playlist la pusiste, cuándo empezó y cuánto sonó de verdad. Va con el identificador de este dispositivo, que Spotify ya conoce por tu sesión.",
     consentSpotifyPlaysTo: "Tu cuenta de Spotify, por la misma sesión con la que ya escuchas.",
-    consentSpotifyPlaysWhen: "Cuando cada canción termina o la saltas.",
+    consentSpotifyPlaysWhen: "Cuando cada canción termina o pasas a otra.",
     consentDiscordPresence: "Mostrar lo que suena en Discord",
     consentDiscordPresenceHint: "Tu estado de Discord dice qué estás escuchando.",
     consentDiscordPresenceWhat:
@@ -708,10 +708,10 @@ export const strings = {
     consentSpotifyPlays: "Count your listening on your account",
     consentSpotifyPlaysHint: "What you play here shows up in your Spotify history and stats.",
     consentSpotifyPlaysWhat:
-      "Each song you listen to: which one, where you played it from (a playlist, the DJ, the radio) and how many seconds you actually heard.",
+      "Each song you listen to for more than 30 seconds: which one, which playlist you played it from, when it started and how long you actually heard it. It goes with this device's identifier, which Spotify already knows from your session.",
     consentSpotifyPlaysTo:
       "Your Spotify account, through the same session you already listen with.",
-    consentSpotifyPlaysWhen: "When each song ends or you skip it.",
+    consentSpotifyPlaysWhen: "When each song ends or you move on to another.",
     consentDiscordPresence: "Show what's playing on Discord",
     consentDiscordPresenceHint: "Your Discord status says what you're listening to.",
     consentDiscordPresenceWhat: "The song's title, artist, album, cover and how far in it is.",

@@ -60,7 +60,7 @@ integración más bajo este mismo modelo de permisos. Dejar esto escrito en
 | 0 | Reglas nuevas en los documentos — **hecha (#182)** | `feat/consented-integrations` | — |
 | 1 | Infraestructura de permisos + sección en Ajustes — **hecha (#183)** | `feat/consent-infrastructure` | 0 |
 | 2 | Discord Rich Presence — **hecha; falta el Application ID** | `feat/discord-presence` | 1 |
-| 3 | Reportar reproducciones a la cuenta | `feat/report-plays` | 1 (sonda primero) |
+| 3 | Reportar reproducciones a la cuenta — **hecha y medida el 27/11/2026** (`docs/reportar-reproducciones.md`) | `feat/report-plays` | 1 |
 | 4 | Dispositivo Connect | `feat/connect-device` | 1 + **decisión del usuario** |
 
 Fases 2 y 3 son independientes entre sí una vez mergeada la 1.
@@ -327,6 +327,19 @@ al revocar.
 
 Commits: `feat(probe): measure how plays reach the account`,
 `feat(playback): report listened plays to the account with consent`.
+
+**Lo que se decidió al hacerla** (detalle en `docs/reportar-reproducciones.md`):
+
+- No hizo falta una sonda para encontrar la puerta: la receta ya estaba medida
+  contra una cuenta real por librespot#1759 y materialfy#54 (`RawCoreStream` a
+  `gabo-receiver-service` más la entrada de `herodotus`). Lo que falta es
+  medirla con esta app.
+- La medida sale de `record_play`, la misma que escribe el historial local, y
+  no de los eventos de `playback.rs`: una sola respuesta a "cuánto se escuchó".
+  Por eso sólo se reportan canciones de 30 segundos o más.
+- Sin cola en disco: un intento por canción, como decía el ROADMAP.
+- Con Soloist activo no se reporta (el cliente oficial ya lo hace); es un punto
+  de contacto nuevo y quedó en la lista de AGENTS.md.
 
 ---
 

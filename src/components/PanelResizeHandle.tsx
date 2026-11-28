@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { PANEL_MIN } from "../lib/panelWidths";
 
 export function PanelResizeHandle({
   side,
@@ -16,12 +17,12 @@ export function PanelResizeHandle({
   onChange: (width: number) => void;
 }) {
   const start = useRef({ x: 0, width });
-  const change = (value: number) => onChange(Math.max(240, Math.min(max, value)));
+  const change = (value: number) => onChange(Math.max(PANEL_MIN, Math.min(max, value)));
   return (
     <hr
       aria-orientation="vertical"
       aria-label={label}
-      aria-valuemin={240}
+      aria-valuemin={PANEL_MIN}
       aria-valuemax={max}
       aria-valuenow={width}
       tabIndex={0}
@@ -49,7 +50,7 @@ export function PanelResizeHandle({
         event.preventDefault();
         change(
           event.key === "Home"
-            ? 240
+            ? PANEL_MIN
             : event.key === "End"
               ? max
               : width + (event.key === "ArrowRight" ? 16 : -16) * (side === "left" ? 1 : -1),

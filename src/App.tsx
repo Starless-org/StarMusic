@@ -39,6 +39,7 @@ import { useBackRoot } from "./lib/back";
 import { type Lang, type StringKey, strings } from "./lib/i18n";
 import { organisedPlaylists, useLibraryOrganisation } from "./lib/libraryOrganisation";
 import { SPRING } from "./lib/motion";
+import { PANEL_MAX, PANEL_MIN, savePanelWidths, storedPanelWidths } from "./lib/panelWidths";
 import {
   placeOfSong,
   queueWithAdded,
@@ -339,8 +340,17 @@ export default function App() {
   const [lang, setLang] = useState<Lang>("es");
   const [active, setActive] = useState<StringKey>("navHome");
   const [libraryOpen, setLibraryOpen] = useState(true);
-  const [libraryWidth, setLibraryWidth] = useState(240);
-  const [queueWidth, setQueueWidth] = useState(240);
+  const [libraryWidth, setLibraryWidth] = useState(() => storedPanelWidths().library);
+  const [queueWidth, setQueueWidth] = useState(() => storedPanelWidths().queue);
+  // Saved once the hand stops, not per pointer event: a drag fires dozens of
+  // widths a second and only the last one is the person's choice.
+  useEffect(() => {
+    const save = window.setTimeout(
+      () => savePanelWidths({ library: libraryWidth, queue: queueWidth }),
+      300,
+    );
+    return () => window.clearTimeout(save);
+  }, [libraryWidth, queueWidth]);
   // Cap both columns against the same viewport so the content keeps breathing room.
   const [panelViewport, setPanelViewport] = useState(window.innerWidth);
   useEffect(() => {
@@ -348,7 +358,7 @@ export default function App() {
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-  const panelMax = Math.max(240, Math.min(480, (panelViewport - 420) / 2));
+  const panelMax = Math.max(PANEL_MIN, Math.min(PANEL_MAX, (panelViewport - 420) / 2));
   const libraryPanelWidth = Math.min(libraryWidth, panelMax);
   const queuePanelWidth = Math.min(queueWidth, panelMax);
   /**

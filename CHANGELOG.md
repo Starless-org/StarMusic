@@ -34,7 +34,7 @@ and Star Music adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### New / Nuevo
 
-- Puedes ajustar el ancho de la biblioteca y la cola arrastrando sus bordes interiores. / Resize the library and play queue by dragging their inner edges.
+- **Puedes ajustar el ancho de la biblioteca y la cola.** Arrastra su borde interior, o usa las flechas con el borde enfocado. El ancho se recuerda al volver a abrir la app. / **You can resize the library and the queue.** Drag their inner edge, or use the arrow keys with the edge focused. The width is remembered when you open the app again.
 
 - **Puedes mostrar en Discord lo que suena, si lo permites.** En Ajustes → Cuenta → Conexiones, un interruptor abre un permiso que dice qué sale —título, artista, álbum, portada y por dónde va la canción—, a quién —la app de Discord de tu computadora y quien vea tu estado— y cuándo. Viene apagado, nada va a Star Music, y apagarlo borra el estado en el acto. Con la canción en pausa no se muestra nada. Por ahora, sólo en Windows. / You can show what's playing on Discord, if you allow it. In Settings → Account → Connections, a switch opens a permission that says what leaves —title, artist, album, cover and how far in the song is—, who gets it —the Discord app on your computer and anyone who sees your status— and when. It starts off, nothing goes to Star Music, and turning it off clears the status at once. Nothing shows while the song is paused. Windows only, for now.
 

@@ -48,6 +48,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         {
           title: "Nuevo",
           items: [
+            "Puedes ajustar el ancho de la biblioteca y la cola arrastrando sus bordes interiores.",
             'Puedes agregar la canción que suena a una playlist desde el reproductor. Un botón junto al nombre de la canción abre la lista de tus playlists, con buscador, "Nueva playlist" y "Canciones que te gustan"; las playlists archivadas quedan al final.',
             "Las cuentas a las que Spotify les niega el audio ya pueden escuchar. A algunas cuentas Premium Spotify les niega las claves de audio, y Star Music no podía sonar para ellas. Ahora la app lo detecta al entrar y ofrece Spotify Soloist en tres pasos: descargar la versión oficial, pegar tu clave personal —que se guarda en el Administrador de credenciales de Windows— y emparejar una vez desde el teléfono. Las cuentas que suenan normal no ven nada de esto. Por ahora, con Soloist el DJ suena como una lista, sin su voz.",
             "Se puede volver a buscar actualizaciones aunque haya una ofrecida. Un botón al lado del de instalar, en Ajustes → General, vuelve a preguntar. La oferta queda en pantalla hasta que llega la respuesta, y no se borra si falla la red.",
@@ -74,6 +75,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         {
           title: "New",
           items: [
+            "Resize the library and play queue by dragging their inner edges.",
             'You can add the playing song to a playlist from the player. A button next to the song\'s name opens your playlists, searchable, "New playlist" and "Liked Songs"; archived playlists come last.',
             "Accounts Spotify refuses audio to can listen now. Some Premium accounts get every audio key refused, and Star Music could not play for them. The app now notices at sign-in and offers Spotify Soloist in three steps: download the official build, paste your personal key —kept in the Windows Credential Manager— and pair once from your phone. Accounts that play normally see none of this. For now, under Soloist the DJ plays as a list, without its voice.",
             "You can check for updates again while one is offered. A button next to the install button, in Settings → General, asks again. The offer stays on screen until the answer arrives, and a dropped network does not wipe it.",

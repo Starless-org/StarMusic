@@ -37,6 +37,7 @@ const at = (index: number) => ({ "--i": index }) as React.CSSProperties;
 const OUT_OF_FRAME = 260;
 
 type QueuePanelProps = {
+  width?: number;
   t: Record<StringKey, string>;
   /** What the backend is holding, or null when nothing is loaded. */
   playing: Track | null;
@@ -144,6 +145,7 @@ function Cover({ track, className }: { track: Track; className: string }) {
  * better spent on something that is true.
  */
 export function QueuePanel({
+  width = 240,
   t,
   playing,
   upNext,
@@ -219,6 +221,7 @@ export function QueuePanel({
       // The panel arrives as one shape and its pieces cascade in
       // (`.cascade` in index.css), the way the library's do.
       data-shown={shown}
+      style={embedded ? undefined : { width }}
       // On the phone the queue takes the artwork's place in the full player
       // (DESIGN.md, "The phone"): the same list, without the side panel's glass
       // and position, inside a surface that already has them.

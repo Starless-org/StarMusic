@@ -15,6 +15,8 @@ Two constraints sharpen it, and both come from PRODUCT.md rather than from taste
 
 ## Shape
 
+The expanded library and desktop play queue can be resized horizontally from their inner edges (240–480px, capped by the viewport to preserve the content column). The collapsed library keeps its 72px rail and shows no separate playback button or reserved space. The player bar remains full width. Resize separators also support arrow keys, Home and End.
+
 Three floating layers over a black ground lit by a grey bloom, and no more.
 
 | Layer | Role | Radius |

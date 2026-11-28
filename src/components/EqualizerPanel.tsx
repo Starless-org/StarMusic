@@ -116,7 +116,7 @@ export function EqualizerPanel({
   };
   return (
     <section
-      className="mt-9 rounded-card border border-white/8 bg-white/4 p-4"
+      className="@container mt-9 rounded-card border border-white/8 bg-white/4 p-4"
       aria-label={t.equalizer}
     >
       <div className="flex items-center justify-between gap-4">
@@ -173,10 +173,10 @@ export function EqualizerPanel({
           </button>
         )}
       </div>
-      <div className="mt-5 grid grid-cols-5 gap-x-2 gap-y-5 sm:grid-cols-10">
+      <div className="mt-5 grid grid-cols-5 gap-x-2 gap-y-5 @lg:grid-cols-10">
         {FREQUENCIES.map((hz, index) => (
           <label key={hz} className="flex flex-col items-center gap-2">
-            <output className="tabular text-[11px] text-ink-muted">
+            <output className="tabular whitespace-nowrap text-[11px] text-ink-muted">
               {(settings?.gains[index] ?? 0).toFixed(1)} dB
             </output>
             <input

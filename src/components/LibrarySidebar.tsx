@@ -29,6 +29,7 @@ const at = (index: number) => ({ "--i": index }) as React.CSSProperties;
 import { SHEET_EXIT, SPRING_SHEET } from "../lib/motion";
 
 type LibrarySidebarProps = {
+  width?: number;
   t: Record<StringKey, string>;
   account: Account | null;
   playlists: Playlist[];
@@ -108,6 +109,7 @@ type LibrarySidebarProps = {
  * different order.
  */
 export function LibrarySidebar({
+  width = PANEL_PX,
   t,
   account,
   playlists,
@@ -216,7 +218,7 @@ export function LibrarySidebar({
       // things at different speeds" this was meant to avoid. One transition for
       // both means the gap is the same 20 px on every frame, and `data-still`
       // stops both at once.
-      style={{ width: collapsed ? RAIL_PX : PANEL_PX }}
+      style={{ width: collapsed ? RAIL_PX : width }}
       className={`surface pointer-events-auto absolute top-[104px] ${barPresent ? "bottom-[144px]" : "bottom-5"} left-5 z-20 flex flex-col overflow-hidden rounded-card transition-[width,bottom] duration-[var(--dur-panel)] ease-[var(--ease-glass)]`}
     >
       {/*
@@ -255,7 +257,7 @@ export function LibrarySidebar({
               // The arriving layer is visible at once and its pieces cascade in
               // (`.cascade` in index.css); the leaving one fades out as a whole.
               data-shown={shown}
-              style={{ width: rail ? RAIL_PX : PANEL_PX }}
+              style={{ width: rail ? RAIL_PX : width }}
               className={`absolute inset-y-0 left-0 flex flex-col transition-opacity ease-[var(--ease-glass)] ${
                 shown ? "opacity-100 duration-100" : "pointer-events-none opacity-0 duration-150"
               }`}

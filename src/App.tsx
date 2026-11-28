@@ -24,6 +24,7 @@ import { LyricsPanel } from "./components/LyricsPanel";
 import { MobileLibrary } from "./components/MobileLibrary";
 import { type MobileTab, MobileTabBar } from "./components/MobileTabBar";
 import { NewPlaylistDialog } from "./components/NewPlaylistDialog";
+import { PanelResizeHandle } from "./components/PanelResizeHandle";
 import { PlayerBar, type RepeatMode } from "./components/PlayerBar";
 import { PlaylistContextMenu } from "./components/PlaylistMenu";
 import { PlaylistScreen } from "./components/PlaylistScreen";
@@ -38,6 +39,7 @@ import { useBackRoot } from "./lib/back";
 import { type Lang, type StringKey, strings } from "./lib/i18n";
 import { organisedPlaylists, useLibraryOrganisation } from "./lib/libraryOrganisation";
 import { SPRING } from "./lib/motion";
+import { PANEL_MAX, PANEL_MIN, savePanelWidths, storedPanelWidths } from "./lib/panelWidths";
 import {
   placeOfSong,
   queueWithAdded,
@@ -338,6 +340,27 @@ export default function App() {
   const [lang, setLang] = useState<Lang>("es");
   const [active, setActive] = useState<StringKey>("navHome");
   const [libraryOpen, setLibraryOpen] = useState(true);
+  const [libraryWidth, setLibraryWidth] = useState(() => storedPanelWidths().library);
+  const [queueWidth, setQueueWidth] = useState(() => storedPanelWidths().queue);
+  // Saved once the hand stops, not per pointer event: a drag fires dozens of
+  // widths a second and only the last one is the person's choice.
+  useEffect(() => {
+    const save = window.setTimeout(
+      () => savePanelWidths({ library: libraryWidth, queue: queueWidth }),
+      300,
+    );
+    return () => window.clearTimeout(save);
+  }, [libraryWidth, queueWidth]);
+  // Cap both columns against the same viewport so the content keeps breathing room.
+  const [panelViewport, setPanelViewport] = useState(window.innerWidth);
+  useEffect(() => {
+    const resize = () => setPanelViewport(window.innerWidth);
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  const panelMax = Math.max(PANEL_MIN, Math.min(PANEL_MAX, (panelViewport - 420) / 2));
+  const libraryPanelWidth = Math.min(libraryWidth, panelMax);
+  const queuePanelWidth = Math.min(queueWidth, panelMax);
   /**
    * The library is a strip of covers by default, and this is the whole reason the
    * content has room. 72px of riel versus 240px of names: the playlist's artwork
@@ -3180,6 +3203,7 @@ export default function App() {
         <AnimatePresence>
           {libraryOpen && !MOBILE && (
             <LibrarySidebar
+              width={libraryPanelWidth}
               t={t}
               account={account.data ?? null}
               playlists={orderedPlaylists}
@@ -3210,6 +3234,7 @@ export default function App() {
           {/* On the phone the queue lives in the full player, where the artwork was. */}
           {queueOpen && !MOBILE && (
             <QueuePanel
+              width={queuePanelWidth}
               t={t}
               playing={status?.trackId ? loadedTrack : null}
               upNext={upNext}
@@ -3227,6 +3252,26 @@ export default function App() {
           )}
         </AnimatePresence>
 
+        {!MOBILE && libraryOpen && !railOnly && (
+          <PanelResizeHandle
+            side="left"
+            width={libraryPanelWidth}
+            max={panelMax}
+            label={t.resizeLibrary}
+            bottom={barPresent ? 144 : 20}
+            onChange={setLibraryWidth}
+          />
+        )}
+        {!MOBILE && queueOpen && (
+          <PanelResizeHandle
+            side="right"
+            width={queuePanelWidth}
+            max={panelMax}
+            label={t.resizeQueue}
+            bottom={barPresent ? 144 : 20}
+            onChange={setQueueWidth}
+          />
+        )}
         {/*
             The jam, next to the queue and not instead of it.
 
@@ -3291,6 +3336,12 @@ export default function App() {
           style={{
             WebkitMaskImage: fade,
             maskImage: fade,
+            ...(!MOBILE
+              ? {
+                  left: libraryOpen ? (railOnly ? 112 : libraryPanelWidth + 40) : 36,
+                  right: queueOpen ? queuePanelWidth + 40 : 36,
+                }
+              : {}),
           }}
           // `pr-3` is the air between the shelf and the scrollbar. Chromium draws the
           // thumb inside the padding box, so padding on the right is exactly that
@@ -3604,8 +3655,8 @@ export default function App() {
           <EdgeFade
             below={moreBelow}
             barPresent={barPresent}
-            left={libraryOpen ? (railOnly ? 112 : 280) : 36}
-            right={queueOpen ? 280 : 36}
+            left={libraryOpen ? (railOnly ? 112 : libraryPanelWidth + 40) : 36}
+            right={queueOpen ? queuePanelWidth + 40 : 36}
             url={groundUrl}
             background={background}
             effect={effect}

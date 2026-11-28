@@ -12,8 +12,9 @@
 //!
 //! **The Application ID is compiled in, and without it there is no
 //! integration.** It is created by the maintainer in Discord's developer portal
-//! with the name "Star Music" and the icon uploaded as the asset `star_music`;
-//! that name is what Discord shows above the song. It is public, not a secret.
+//! with the name "Star Music"; that name is what Discord shows above the song.
+//! The header icon is set in that portal. The activity uses the project's
+//! public PNG for its artwork badge. The Application ID is public.
 //! A build without it reports the integration as unavailable and Settings does
 //! not draw the switch. As with `STAR_MUSIC_REPORT_RELAY`, an Actions variable
 //! that does not exist arrives as an empty string, so empty counts as missing.
@@ -54,9 +55,10 @@ pub fn available() -> bool {
     cfg!(windows) && app_id().is_some()
 }
 
-/// The asset uploaded to the Discord application, shown when a song has no
-/// cover or its URL is one Discord would refuse.
-const FALLBACK_IMAGE: &str = "star_music";
+/// A pinned public copy of the icon shipped by this project. Discord accepts
+/// external images, so a missing Developer Portal asset does not hide the badge.
+const FALLBACK_IMAGE: &str =
+    "https://raw.githubusercontent.com/Starless-org/StarMusic/50adffb/src-tauri/icons/icon.png";
 
 /// Discord rejects text fields shorter than 2 or longer than 128 characters.
 const TEXT_MIN: usize = 2;
@@ -188,6 +190,10 @@ fn activity(now: Option<&NowPlaying>, at_ms: i64) -> Option<Value> {
         .filter(|url| url.starts_with("https://") && url.len() <= IMAGE_MAX)
         .unwrap_or(FALLBACK_IMAGE);
     activity["assets"] = json!({ "large_image": image });
+    if image != FALLBACK_IMAGE {
+        activity["assets"]["small_image"] = json!(FALLBACK_IMAGE);
+        activity["assets"]["small_text"] = json!(crate::paths::APP_DIR);
+    }
     if let Some(album) = fit(&now.album) {
         activity["assets"]["large_text"] = json!(album);
     }
@@ -227,9 +233,7 @@ mod pipe {
 
     use serde_json::{Value, json};
 
-    use super::{
-        MIN_GAP, Message, RECONNECT_EVERY, activity, app_id, frame, set_activity,
-    };
+    use super::{MIN_GAP, Message, RECONNECT_EVERY, activity, app_id, frame, set_activity};
     use crate::consent::{self, Integration};
 
     const HANDSHAKE: u32 = 0;
@@ -254,7 +258,8 @@ mod pipe {
                     .ok()
             })?;
             let mut pipe = Pipe { file, nonce: 0 };
-            pipe.write(HANDSHAKE, &json!({ "v": 1, "client_id": id })).ok()?;
+            pipe.write(HANDSHAKE, &json!({ "v": 1, "client_id": id }))
+                .ok()?;
             match pipe.read() {
                 Ok((FRAME, _)) => Some(pipe),
                 Ok((CLOSE, reply)) => {
@@ -460,7 +465,10 @@ mod tests {
         assert_eq!(activity["type"], 2);
         assert_eq!(activity["details"], "Duvet");
         assert_eq!(activity["state"], "bôa");
-        assert_eq!(activity["assets"]["large_image"], "https://i.scdn.co/image/abc");
+        assert_eq!(
+            activity["assets"]["large_image"],
+            "https://i.scdn.co/image/abc"
+        );
         assert_eq!(activity["assets"]["large_text"], "Twilight");
         assert_eq!(activity["timestamps"]["start"], 970_000);
         assert_eq!(activity["timestamps"]["end"], 1_170_000);
@@ -508,10 +516,16 @@ mod tests {
     fn a_cover_discord_would_refuse_falls_back_to_the_icon() {
         let mut long = song();
         long.artwork = Some(format!("https://{}", "a".repeat(300)));
-        assert_eq!(activity(Some(&long), 0).unwrap()["assets"]["large_image"], FALLBACK_IMAGE);
+        assert_eq!(
+            activity(Some(&long), 0).unwrap()["assets"]["large_image"],
+            FALLBACK_IMAGE
+        );
         let mut plain = song();
         plain.artwork = Some("http://insecure".into());
-        assert_eq!(activity(Some(&plain), 0).unwrap()["assets"]["large_image"], FALLBACK_IMAGE);
+        assert_eq!(
+            activity(Some(&plain), 0).unwrap()["assets"]["large_image"],
+            FALLBACK_IMAGE
+        );
     }
 
     /// The webview sends camelCase, as it always has for the phone; a rename
@@ -531,5 +545,21 @@ mod tests {
     #[test]
     fn an_empty_app_id_is_no_app_id() {
         assert_eq!(Some("").map(str::trim).filter(|id| !id.is_empty()), None);
+    }
+
+    #[test]
+    fn the_app_icon_is_a_badge_over_the_original_album_cover() {
+        let rendered = activity(Some(&song()), 0).unwrap();
+        assert_eq!(
+            rendered["assets"]["large_image"],
+            "https://i.scdn.co/image/abc"
+        );
+        assert_eq!(rendered["assets"]["small_image"], FALLBACK_IMAGE);
+        assert_eq!(rendered["assets"]["small_text"], crate::paths::APP_DIR);
+        let mut without_cover = song();
+        without_cover.artwork = None;
+        let fallback = activity(Some(&without_cover), 0).unwrap();
+        assert_eq!(fallback["assets"]["large_image"], FALLBACK_IMAGE);
+        assert!(fallback["assets"].get("small_image").is_none());
     }
 }

@@ -251,6 +251,10 @@ Commit: `feat(discord): show what is playing in Discord when the person allows i
 - La posición se toma cuando cambia la canción o el play/pausa; un salto dentro
   de la canción no mueve la barra de Discord.
 - El DJ hablando muestra su nombre, sin artista, sin portada y sin barra.
+- Con portada, el icono de Star Music aparece como imagen pequeña superpuesta.
+  Sin portada se usa como imagen principal. Es el PNG oficial fijado a un commit
+  público del proyecto. El icono de cabecera de la aplicación se configura en
+  Developer Portal y no lo controla el payload de Rich Presence.
 - Sólo Windows por ahora; Linux y macOS usan un socket Unix.
 - Falta: crear la aplicación en el portal de Discord y cargar su ID como la
   variable del repositorio `STAR_MUSIC_DISCORD_APP_ID`. Sin ella, la integración

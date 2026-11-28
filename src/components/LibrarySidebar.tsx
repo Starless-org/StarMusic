@@ -451,7 +451,7 @@ export function LibrarySidebar({
                               : undefined
                           }
                         />
-                        {!isDjCard(playlist) && playlist.tracks?.total !== 0 && (
+                        {!collapsed && !isDjCard(playlist) && playlist.tracks?.total !== 0 && (
                           <SidebarPlayButton
                             label={`${transport?.id === playlist.id ? (transport.playing ? t.pause : t.resume) : t.play} — ${playlist.name}`}
                             playing={transport?.id === playlist.id && transport.playing}
@@ -557,7 +557,7 @@ export function LibrarySidebar({
                       <div
                         key={playlist.id}
                         style={at(4 + index)}
-                        className={`cascade group/sidebar relative w-full rounded-[14px] ${collapsed ? "pb-7" : ""} ${organisation.preference(playlist.id).pinned ? "cursor-grab active:cursor-grabbing" : ""} ${dropPin === playlist.id ? "ring-2 ring-accent" : ""}`}
+                        className={`cascade group/sidebar relative w-full rounded-[14px] ${organisation.preference(playlist.id).pinned ? "cursor-grab active:cursor-grabbing" : ""} ${dropPin === playlist.id ? "ring-2 ring-accent" : ""}`}
                         {...pinDrag(playlist.id)}
                         data-playlist-id={isDjCard(playlist) ? undefined : playlist.id}
                       >
@@ -610,7 +610,7 @@ export function LibrarySidebar({
                             />
                           )}
                         </button>
-                        {!isDjCard(playlist) && playlist.tracks?.total !== 0 && (
+                        {!collapsed && !isDjCard(playlist) && playlist.tracks?.total !== 0 && (
                           <SidebarPlayButton
                             label={`${transport?.id === playlist.id ? (transport.playing ? t.pause : t.resume) : t.play} — ${playlist.name}`}
                             playing={transport?.id === playlist.id && transport.playing}

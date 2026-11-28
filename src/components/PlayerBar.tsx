@@ -1109,7 +1109,7 @@ export function PlayerBar({
             aria-label={muted ? t.unmute : t.mute}
             title={muted ? t.unmute : t.mute}
             className={`shrink-0 transition-colors duration-200 ${
-              muted ? "text-live-ink" : "text-ink-muted hover:text-ink"
+              muted ? "text-accent-ink" : "text-ink-muted hover:text-ink"
             }`}
           >
             {muted ? (

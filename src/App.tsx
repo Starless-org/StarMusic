@@ -359,7 +359,7 @@ export default function App() {
    *
    * A queue you have to go looking for is a queue nobody reads, and the button that
    * opens it sits next to the volume looking like one more control. Nothing else
-   * had to change: it already survives navigation, and Escape, the X and the button
+   * had to change: it already survives navigation, and the X and the button
    * are the only ways out.
    */
   const [queueOpen, setQueueOpen] = useState(!MOBILE);
@@ -2755,24 +2755,16 @@ export default function App() {
     setRepeat((mode) => (mode === "off" ? "all" : mode === "all" ? "one" : "off"));
   }, []);
 
-  /**
-   * Escape backs out of whatever is open.
-   *
-   * The library is in here for the same reason the other two are, and it was the
-   * only way out of a state that had none: below `lg` the sidebar is a sheet, and
-   * on a window narrower than the search field there is nothing else to click.
-   */
+  /** Escape dismisses settings while preserving the user's docked panels. */
   useEffect(() => {
-    if (!settingsOpen && !queueOpen && !libraryOpen) return;
+    if (!settingsOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setSettingsOpen(false);
-      setQueueOpen(false);
-      setLibraryOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [settingsOpen, queueOpen, libraryOpen]);
+  }, [settingsOpen]);
 
   /**
    * Which main surface is on, and only one of them draws a heading.

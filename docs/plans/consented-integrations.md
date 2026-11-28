@@ -248,6 +248,11 @@ Commit: `feat(discord): show what is playing in Discord when the person allows i
 - IPC escrito a mano (sin crate): ~200 líneas, sin dependencias nuevas.
 - En pausa, el estado **se borra** (no "En pausa" sin tiempos): el diálogo dice
   "mientras suena algo".
+- El estado incluye un botón al repositorio público de Star Music. Su etiqueta
+  viene de i18n por el mismo `media_session`. El permiso de Discord pasa a
+  versión 2 para que la persona acepte el texto que incluye el enlace.
+  Discord sólo muestra los botones a otros usuarios: se verifica desde otra
+  cuenta, según su guía de Rich Presence.
 - La posición se toma cuando cambia la canción o el play/pausa; un salto dentro
   de la canción no mueve la barra de Discord.
 - El DJ hablando muestra su nombre, sin artista, sin portada y sin barra.

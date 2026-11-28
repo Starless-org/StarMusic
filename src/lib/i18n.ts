@@ -10,6 +10,7 @@ export type Lang = "es" | "en";
 
 export const strings = {
   es: {
+    rpcRepository: "Star Music · GitHub",
     pinPlaylist: "Fijar playlist",
     movePinnedUp: "Mover fijada hacia arriba",
     movePinnedDown: "Mover fijada hacia abajo",
@@ -119,7 +120,7 @@ export const strings = {
     consentDiscordPresence: "Mostrar lo que suena en Discord",
     consentDiscordPresenceHint: "Tu estado de Discord dice qué estás escuchando.",
     consentDiscordPresenceWhat:
-      "El título, el artista, el álbum, la portada y por dónde va la canción.",
+      "El título, el artista, el álbum, la portada, por dónde va la canción y un enlace público al proyecto.",
     consentDiscordPresenceTo:
       "La app de Discord de esta computadora y, desde ahí, quien pueda ver tu estado.",
     consentDiscordPresenceWhen: "Mientras suena algo, y cada vez que cambia la canción.",
@@ -610,6 +611,7 @@ export const strings = {
     soloistRemove: "Quitar",
   },
   en: {
+    rpcRepository: "Star Music · GitHub",
     pinPlaylist: "Pin playlist",
     movePinnedUp: "Move pinned playlist up",
     movePinnedDown: "Move pinned playlist down",
@@ -714,7 +716,8 @@ export const strings = {
     consentSpotifyPlaysWhen: "When each song ends or you move on to another.",
     consentDiscordPresence: "Show what's playing on Discord",
     consentDiscordPresenceHint: "Your Discord status says what you're listening to.",
-    consentDiscordPresenceWhat: "The song's title, artist, album, cover and how far in it is.",
+    consentDiscordPresenceWhat:
+      "The song's title, artist, album, cover, how far in it is and a public link to the project.",
     consentDiscordPresenceTo:
       "The Discord app on this computer and, from there, anyone who can see your status.",
     consentDiscordPresenceWhen: "While something plays, and every time the song changes.",

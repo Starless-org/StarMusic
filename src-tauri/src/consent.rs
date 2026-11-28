@@ -70,7 +70,7 @@ impl Integration {
     pub fn version(self) -> u32 {
         match self {
             Integration::SpotifyPlays => 1,
-            Integration::DiscordPresence => 1,
+            Integration::DiscordPresence => 2,
             Integration::ConnectDevice => 1,
         }
     }

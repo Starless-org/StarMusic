@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useMemo, useSyncExternalStore } from "react";
 import { type HomeLayout, normaliseHomeLayout } from "./homeLayoutModel";
-import { errors, type Lang } from "./i18n";
+import { errors, type Lang, strings } from "./i18n";
 import {
   type LibraryOrganisation,
   normaliseOrganisation,
@@ -735,7 +735,9 @@ export type NowPlaying = {
 export async function mediaSession(now: NowPlaying | null): Promise<void> {
   if (!hasBackend()) return;
   window.StarMusicMedia?.nowPlaying(JSON.stringify(now));
-  return invoke<void>("media_session", { now });
+  return invoke<void>("media_session", {
+    now: now === null ? null : { ...now, repositoryLabel: strings[errorLang].rpcRepository },
+  });
 }
 
 /** `seek` comes only from the phone's lock screen, with the position it was dragged to. */

@@ -104,7 +104,7 @@ The list of integrations is closed: one that is not here does not ship.
 | Integration | What leaves | To whom |
 |---|---|---|
 | Plays on your account | Each song heard, with its context and the time really listened | Your Spotify account, through the session already signed in |
-| Discord status | Title, artist, album, cover and progress of what is playing | The Discord app on this machine, and the people who see your status |
+| Discord status | Title, artist, album, cover, progress and a public project link | The Discord app on this machine, and the people who see your status |
 | Connect device (undecided) | That Star Music is a device, and what it plays | Your other devices on the same account |
 
 **CarPlay and Android Auto are not on the list, and not by choice.** CarPlay needs an iOS app with Apple's CarPlay entitlement and Android Auto needs an Android app; a Windows desktop client can be neither. The road towards the car is the Connect device: a phone that sees Star Music can control it. If the Android app (`docs/android.md`) ships, Android Auto joins this list under the same four conditions. Until then, nothing may promise it.

@@ -85,6 +85,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         {
           title: "Fixed",
           items: [
+            "Discord activity includes a button to the Star Music repository. The permission describes the link and is requested again when enabling the integration.",
             "The app offered 0.5.5 after 0.6.0 was out. It checked once at launch, and since Star Music lives in the tray that answer stayed on screen for days: someone coming from the prerelease had to install 0.5.5 before being offered 0.6.0. It now asks again when Settings opens and, on its own, every six hours.",
             "Turning shuffle off brings the playlist's order back. The shuffled order used to stay, so the switch had no real off. The song that is playing keeps playing at its place, and what you queued while shuffled stays right after it.",
             "Opening another playlist no longer empties the queue. The queue changes only when you play something, so looking at another list no longer leaves the playing song with nothing behind it.",
@@ -128,6 +129,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         {
           title: "Corregido",
           items: [
+            "La actividad de Discord incluye un botón al repositorio de Star Music. El permiso describe el enlace y se vuelve a pedir al activar la integración.",
             "El contenido vuelve a desvanecerse en los bordes, y los accesos de Inicio llegan esmerilados. Con las superficies esmeriladas, la lista se cortaba en recto bajo la barra de arriba y sobre el reproductor; ahora se desvanece. Y al volver a Inicio, los accesos ya no se ven sin esmerilar durante un momento.",
             "Con una imagen de fondo clara, el texto ya se puede leer. Los menús de búsqueda y de canción usan el mismo material que las superficies y siguen su opacidad; los subtítulos, las notas y las letras que van directo sobre la imagen tienen más presencia; y las pestañas de «Lo más escuchado» siguen la opacidad de las superficies.",
             "Terminar la tarea de la app ya no se toma como un crash. Cerrarla desde el Administrador de tareas, apagar el equipo o quedarse sin luz abría al volver un aviso para reportar un fallo que no existió. Ahora el aviso sale solo cuando la app falló de verdad y alcanzó a dejarlo escrito.",

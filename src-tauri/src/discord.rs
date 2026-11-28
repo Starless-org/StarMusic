@@ -57,6 +57,7 @@ pub fn available() -> bool {
 /// The asset uploaded to the Discord application, shown when a song has no
 /// cover or its URL is one Discord would refuse.
 const FALLBACK_IMAGE: &str = "star_music";
+const REPOSITORY_URL: &str = "https://github.com/Starless-org/StarMusic";
 
 /// Discord rejects text fields shorter than 2 or longer than 128 characters.
 const TEXT_MIN: usize = 2;
@@ -181,6 +182,10 @@ fn activity(now: Option<&NowPlaying>, at_ms: i64) -> Option<Value> {
     if let Some(state) = fit(&now.artist) {
         activity["state"] = json!(state);
     }
+    if let Some(label) = now.repository_label.as_deref().and_then(fit) {
+        activity["buttons"] =
+            json!([{ "label": label.chars().take(32).collect::<String>(), "url": REPOSITORY_URL }]);
+    }
 
     let image = now
         .artwork
@@ -227,9 +232,7 @@ mod pipe {
 
     use serde_json::{Value, json};
 
-    use super::{
-        MIN_GAP, Message, RECONNECT_EVERY, activity, app_id, frame, set_activity,
-    };
+    use super::{MIN_GAP, Message, RECONNECT_EVERY, activity, app_id, frame, set_activity};
     use crate::consent::{self, Integration};
 
     const HANDSHAKE: u32 = 0;
@@ -254,7 +257,8 @@ mod pipe {
                     .ok()
             })?;
             let mut pipe = Pipe { file, nonce: 0 };
-            pipe.write(HANDSHAKE, &json!({ "v": 1, "client_id": id })).ok()?;
+            pipe.write(HANDSHAKE, &json!({ "v": 1, "client_id": id }))
+                .ok()?;
             match pipe.read() {
                 Ok((FRAME, _)) => Some(pipe),
                 Ok((CLOSE, reply)) => {
@@ -441,6 +445,7 @@ mod tests {
             album: "Twilight".into(),
             artwork: Some("https://i.scdn.co/image/abc".into()),
             playing: true,
+            repository_label: Some("Star Music · GitHub".into()),
             position_ms: 30_000.0,
             duration_ms: 200_000.0,
         }
@@ -460,7 +465,10 @@ mod tests {
         assert_eq!(activity["type"], 2);
         assert_eq!(activity["details"], "Duvet");
         assert_eq!(activity["state"], "bôa");
-        assert_eq!(activity["assets"]["large_image"], "https://i.scdn.co/image/abc");
+        assert_eq!(
+            activity["assets"]["large_image"],
+            "https://i.scdn.co/image/abc"
+        );
         assert_eq!(activity["assets"]["large_text"], "Twilight");
         assert_eq!(activity["timestamps"]["start"], 970_000);
         assert_eq!(activity["timestamps"]["end"], 1_170_000);
@@ -484,6 +492,7 @@ mod tests {
             album: String::new(),
             artwork: None,
             playing: true,
+            repository_label: None,
             position_ms: 0.0,
             duration_ms: 0.0,
         };
@@ -508,10 +517,16 @@ mod tests {
     fn a_cover_discord_would_refuse_falls_back_to_the_icon() {
         let mut long = song();
         long.artwork = Some(format!("https://{}", "a".repeat(300)));
-        assert_eq!(activity(Some(&long), 0).unwrap()["assets"]["large_image"], FALLBACK_IMAGE);
+        assert_eq!(
+            activity(Some(&long), 0).unwrap()["assets"]["large_image"],
+            FALLBACK_IMAGE
+        );
         let mut plain = song();
         plain.artwork = Some("http://insecure".into());
-        assert_eq!(activity(Some(&plain), 0).unwrap()["assets"]["large_image"], FALLBACK_IMAGE);
+        assert_eq!(
+            activity(Some(&plain), 0).unwrap()["assets"]["large_image"],
+            FALLBACK_IMAGE
+        );
     }
 
     /// The webview sends camelCase, as it always has for the phone; a rename
@@ -531,5 +546,12 @@ mod tests {
     #[test]
     fn an_empty_app_id_is_no_app_id() {
         assert_eq!(Some("").map(str::trim).filter(|id| !id.is_empty()), None);
+    }
+
+    #[test]
+    fn the_public_button_links_to_the_project_without_user_identifiers() {
+        let activity = activity(Some(&song()), 1_000_000).unwrap();
+        assert_eq!(activity["buttons"][0]["url"], REPOSITORY_URL);
+        assert_eq!(activity["buttons"][0]["label"], "Star Music · GitHub");
     }
 }

@@ -27,6 +27,9 @@ pub struct NowPlaying {
     pub album: String,
     pub artwork: Option<String>,
     pub playing: bool,
+    /// Public project button, supplied by the same media-session wrapper.
+    #[serde(default, rename = "repositoryLabel")]
+    pub repository_label: Option<String>,
     /// Where the song is, as heard, and how long it lasts as shown. The
     /// webview has sent both all along for the phone's lock screen; Windows'
     /// card does not use them, Discord's progress bar does (`discord.rs`).

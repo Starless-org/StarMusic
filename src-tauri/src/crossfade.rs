@@ -315,6 +315,7 @@ fn samples_to_duration(samples: u64) -> Duration {
 /// Una cola de audio sobre el mixer.
 struct Deck {
     sink: rodio::Sink,
+    equalizer: Arc<Mutex<crate::equalizer::Processor>>,
     /// Las muestras que entraron.
     queued: AtomicU64,
     /// Las muestras que ya sonaron. Lo suma cada paquete al soltarse.
@@ -334,6 +335,7 @@ impl Deck {
         sink.set_volume(volume);
         Arc::new(Deck {
             sink,
+            equalizer: crate::equalizer::Processor::new(),
             queued: AtomicU64::new(0),
             played: Arc::new(AtomicU64::new(0)),
             fade: AtomicU64::new(0),
@@ -346,7 +348,7 @@ impl Deck {
         let count = samples.len() as u64;
         self.queued.fetch_add(count, Ordering::Relaxed);
         self.sink.append(Counted {
-            inner: rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples),
+            inner: crate::equalizer::Packet::new(samples, self.equalizer.clone()),
             samples: count,
             played: self.played.clone(),
         });
@@ -367,7 +369,7 @@ impl Deck {
 /// Es lo que deja saber cuánto le queda a un final en cola: rodio sabe cuántas
 /// fuentes le quedan, no cuánto duran.
 struct Counted {
-    inner: rodio::buffer::SamplesBuffer,
+    inner: crate::equalizer::Packet,
     samples: u64,
     played: Arc<AtomicU64>,
 }

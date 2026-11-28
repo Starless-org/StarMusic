@@ -70,6 +70,7 @@ src-tauri/src/
   spclient/plays.rs       los eventos que hacen que una canción cuente en la cuenta
   models.rs               las formas que el frontend ve
   playback.rs             el player de librespot y el volumen
+  equalizer.rs            EQ nativo y perfiles locales; filtra cada paquete al salir de la cola
   voice.rs                la voz del DJ: el sink propio y el audio de la narración
   media_keys.rs           las teclas multimedia y la tarjeta de medios de Windows
   tray.rs                 el ícono de la bandeja y su menú

@@ -240,6 +240,16 @@ What that means concretely:
   to somebody who knows what it means; two copies of the app on one machine used to
   look identical.
 
+## Music equalizer
+
+Audio settings place the EQ after quality, normalisation and crossfade. A single
+bordered settings card holds the enable control, preset picker, ten labelled
+vertical native ranges and the named-profile form. Five bands per row on narrow
+screens keep every control reachable. Gains are shown in dB and each range has
+an accessible frequency label. Profiles use names chosen by the person and live
+on this device. A pending save and an unsuccessful save are shown explicitly.
+Boosts receive automatic headroom compensation in the native audio path.
+
 ## Player bar geometry
 
 Three columns — `1fr auto 1fr` — so the transport sits on the optical centre of the

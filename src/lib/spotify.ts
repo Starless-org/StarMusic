@@ -789,6 +789,20 @@ export function hasBackend(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+export type EqualizerSettings = {
+  enabled: boolean;
+  gains: number[];
+  presets: { name: string; gains: number[] }[];
+};
+
+export function equalizerSettings(): Promise<EqualizerSettings> {
+  return invoke("equalizer_settings");
+}
+
+export function setEqualizerSettings(settings: EqualizerSettings): Promise<EqualizerSettings> {
+  return invoke("set_equalizer_settings", { settings });
+}
+
 function clampOpacity(value: number): number {
   return Math.min(SURFACE_OPACITY_MAX, Math.max(SURFACE_OPACITY_MIN, Math.round(value)));
 }

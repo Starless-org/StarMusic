@@ -16,6 +16,7 @@ mod beat;
 mod consent;
 mod crossfade;
 mod discord;
+mod equalizer;
 mod history;
 mod keycheck;
 mod keyprobe;
@@ -2063,6 +2064,16 @@ fn crossfade_seconds() -> u8 {
     settings::saved_crossfade_seconds()
 }
 
+#[tauri::command]
+async fn equalizer_settings() -> Result<equalizer::Settings, String> {
+    tauri::async_runtime::spawn_blocking(equalizer::load).await.map_err(|_| "command_failed".to_string())?
+}
+
+#[tauri::command]
+async fn set_equalizer_settings(settings: equalizer::Settings) -> Result<equalizer::Settings, String> {
+    tauri::async_runtime::spawn_blocking(move || equalizer::save(settings)).await.map_err(|_| "command_failed".to_string())?
+}
+
 /// Remember it, and hand it to the audio thread: it applies from the next song.
 #[tauri::command]
 fn set_crossfade_seconds(seconds: u8) {
@@ -2493,6 +2504,8 @@ pub fn run() {
             set_surface_opacity,
             reset_customisation,
             crossfade_seconds,
+            equalizer_settings,
+            set_equalizer_settings,
             set_crossfade_seconds,
             record_play,
             home_stats,

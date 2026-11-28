@@ -109,6 +109,14 @@ The list of integrations is closed: one that is not here does not ship.
 
 **CarPlay and Android Auto are not on the list, and not by choice.** CarPlay needs an iOS app with Apple's CarPlay entitlement and Android Auto needs an Android app; a Windows desktop client can be neither. The road towards the car is the Connect device: a phone that sees Star Music can control it. If the Android app (`docs/android.md`) ships, Android Auto joins this list under the same four conditions. Until then, nothing may promise it.
 
+### Equalizer profiles stay on this device
+
+The music equalizer offers ten bands and general-purpose presets. Named profiles
+live in `equalizer.json` beside settings and survive sign-out. EQ runs in the
+native music sink, including crossfades. Soloist owns a separate audio output,
+which is explained in Audio settings when that account uses it. The DJ's spoken
+introductions retain their voice output.
+
 ### Library organisation stays local
 
 Pinning and archiving playlists are per-account preferences on this device.

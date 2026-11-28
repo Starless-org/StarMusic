@@ -58,7 +58,7 @@ pub fn available() -> bool {
 /// A pinned public copy of the icon shipped by this project. Discord accepts
 /// external images, so a missing Developer Portal asset does not hide the badge.
 const FALLBACK_IMAGE: &str =
-    "https://raw.githubusercontent.com/Starless-org/StarMusic/50adffb/src-tauri/icons/icon.png";
+    "https://raw.githubusercontent.com/Starless-org/StarMusic/50adffbc3c77e21c7d49203c5fac6293ee624b2d/src-tauri/icons/icon.png";
 
 /// Discord rejects text fields shorter than 2 or longer than 128 characters.
 const TEXT_MIN: usize = 2;
